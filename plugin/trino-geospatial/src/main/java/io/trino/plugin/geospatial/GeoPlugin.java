@@ -50,6 +50,7 @@ public class GeoPlugin
                 .add(EncodedPolylineFunctions.class)
                 .add(SpatialPartitioningAggregateFunction.class)
                 .add(SpatialPartitioningInternalAggregateFunction.class)
+                .add(MaxmindFunctions.class)
                 .build();
     }
 }
