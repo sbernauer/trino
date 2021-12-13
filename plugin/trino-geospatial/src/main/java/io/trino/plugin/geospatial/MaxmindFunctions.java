@@ -43,10 +43,8 @@ import java.util.Optional;
 
 public class MaxmindFunctions
 {
-    private static final String MAXMIND_CITY_DATABASE_FILE = "/home/sbernauer/Downloads/GeoIP2-City_20211012/GeoIP2-City.mmdb";
-    // private static final String MAXMIND_CITY_DATABASE_FILE = "/tmp/GeoIP2-City.mmdb";
-    private static final String MAXMIND_ISP_DATABASE_FILE = "/home/sbernauer/Downloads/GeoIP2-ISP_20211012/GeoIP2-ISP.mmdb";
-    // private static final String MAXMIND_ISP_DATABASE_FILE = "/tmp/GeoIP2-ISP.mmdb";
+    private static final String MAXMIND_CITY_DATABASE_FILE = "/tmp/GeoIP2-City.mmdb";
+    private static final String MAXMIND_ISP_DATABASE_FILE = "/tmp/GeoIP2-ISP.mmdb";
 
     private static DatabaseReader cityReader;
     private static DatabaseReader ispReader;
