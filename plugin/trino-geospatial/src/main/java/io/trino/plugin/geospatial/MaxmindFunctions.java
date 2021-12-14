@@ -95,6 +95,22 @@ public class MaxmindFunctions
         return finishBlock(blockBuilders);
     }
 
+    @ScalarFunction("maxmind_country_name")
+    @Description("Queries the maxmind database and returns the name of the country")
+    @SqlNullable
+    @SqlType(StandardTypes.VARCHAR)
+    public static Slice maxmind_country_name(
+            @SqlType(StandardTypes.IPADDRESS) Slice ip)
+            throws IOException, GeoIp2Exception
+    {
+        InetAddress ipAddress = InetAddress.getByAddress(ip.getBytes());
+        Optional<CityResponse> cityResponse = getCityResponse(ipAddress);
+        if (cityResponse.isEmpty() || cityResponse.get().getCountry().getName() == null) { // Intentionally not checking for cityResponse.get().getCountry() == null for performance reasons
+            return null;
+        }
+        return Slices.utf8Slice(cityResponse.get().getCountry().getName());
+    }
+
     @ScalarFunction("maxmind_city")
     @Description("Queries the maxmind database and returns information about the city")
     @SqlNullable
@@ -120,6 +136,22 @@ public class MaxmindFunctions
         addStringRowField(blockBuilders, cityResponse.get().getPostal().getCode());
 
         return finishBlock(blockBuilders);
+    }
+
+    @ScalarFunction("maxmind_city_name")
+    @Description("Queries the maxmind database and returns the name of the city")
+    @SqlNullable
+    @SqlType(StandardTypes.VARCHAR)
+    public static Slice maxmind_city_name(
+            @SqlType(StandardTypes.IPADDRESS) Slice ip)
+            throws IOException, GeoIp2Exception
+    {
+        InetAddress ipAddress = InetAddress.getByAddress(ip.getBytes());
+        Optional<CityResponse> cityResponse = getCityResponse(ipAddress);
+        if (cityResponse.isEmpty() || cityResponse.get().getCity().getName() == null) { // Intentionally not checking for cityResponse.get().getCity() == null for performance reasons
+            return null;
+        }
+        return Slices.utf8Slice(cityResponse.get().getCity().getName());
     }
 
     @ScalarFunction("maxmind_country_and_city")
@@ -201,6 +233,22 @@ public class MaxmindFunctions
         addStringRowField(blockBuilders, ispResponse.get().getAutonomousSystemOrganization());
 
         return finishBlock(blockBuilders);
+    }
+
+    @ScalarFunction("maxmind_isp_name")
+    @Description("Queries the maxmind database and returns the name of the ISP")
+    @SqlNullable
+    @SqlType(StandardTypes.VARCHAR)
+    public static Slice maxmind_isp_name(
+            @SqlType(StandardTypes.IPADDRESS) Slice ip)
+            throws IOException, GeoIp2Exception
+    {
+        InetAddress ipAddress = InetAddress.getByAddress(ip.getBytes());
+        Optional<IspResponse> ispResponse = getIspResponse(ipAddress);
+        if (ispResponse.isEmpty() || ispResponse.get().getIsp() == null) {
+            return null;
+        }
+        return Slices.utf8Slice(ispResponse.get().getIsp());
     }
 
     @ScalarFunction("maxmind_isp_full_json")
