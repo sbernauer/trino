@@ -49,14 +49,25 @@ public class MaxmindFunctions
     private static DatabaseReader cityReader;
     private static DatabaseReader ispReader;
 
+    private static class BlockBuilders
+    {
+        RowType rowType;
+        PageBuilder pageBuilder;
+        BlockBuilder blockBuilder;
+        BlockBuilder entryBlockBuilder;
+
+        public BlockBuilders(RowType rowType, PageBuilder pageBuilder, BlockBuilder blockBuilder, BlockBuilder entryBlockBuilder)
+        {
+            this.rowType = rowType;
+            this.pageBuilder = pageBuilder;
+            this.blockBuilder = blockBuilder;
+            this.entryBlockBuilder = entryBlockBuilder;
+        }
+    }
+
     private MaxmindFunctions()
     {
     }
-
-    private static RowType rowType;
-    private static PageBuilder pageBuilder;
-    private static BlockBuilder blockBuilder;
-    private static BlockBuilder entryBlockBuilder;
 
     @ScalarFunction("maxmind_country")
     @Description("Queries the maxmind database and returns information about the country")
@@ -75,13 +86,13 @@ public class MaxmindFunctions
         if (cityResponse.isEmpty()) {
             return null;
         }
-        createBlockBuilders(ImmutableList.of(VarcharType.VARCHAR, VarcharType.VARCHAR, BooleanType.BOOLEAN));
+        BlockBuilders blockBuilders = createBlockBuilders(ImmutableList.of(VarcharType.VARCHAR, VarcharType.VARCHAR, BooleanType.BOOLEAN));
 
-        addStringRowField(cityResponse.get().getCountry().getIsoCode());
-        addStringRowField(cityResponse.get().getCountry().getName());
-        addBooleanRowField(cityResponse.get().getCountry().isInEuropeanUnion());
+        addStringRowField(blockBuilders, cityResponse.get().getCountry().getIsoCode());
+        addStringRowField(blockBuilders, cityResponse.get().getCountry().getName());
+        addBooleanRowField(blockBuilders, cityResponse.get().getCountry().isInEuropeanUnion());
 
-        return finishBlock();
+        return finishBlock(blockBuilders);
     }
 
     @ScalarFunction("maxmind_city")
@@ -102,13 +113,13 @@ public class MaxmindFunctions
             return null;
         }
 
-        createBlockBuilders(ImmutableList.of(VarcharType.VARCHAR, BigintType.BIGINT, VarcharType.VARCHAR));
+        BlockBuilders blockBuilders = createBlockBuilders(ImmutableList.of(VarcharType.VARCHAR, BigintType.BIGINT, VarcharType.VARCHAR));
 
-        addStringRowField(cityResponse.get().getCity().getName());
-        addBigIntRowField(cityResponse.get().getCity().getGeoNameId());
-        addStringRowField(cityResponse.get().getPostal().getCode());
+        addStringRowField(blockBuilders, cityResponse.get().getCity().getName());
+        addBigIntRowField(blockBuilders, cityResponse.get().getCity().getGeoNameId());
+        addStringRowField(blockBuilders, cityResponse.get().getPostal().getCode());
 
-        return finishBlock();
+        return finishBlock(blockBuilders);
     }
 
     @ScalarFunction("maxmind_country_and_city")
@@ -132,17 +143,17 @@ public class MaxmindFunctions
             return null;
         }
 
-        createBlockBuilders(ImmutableList.of(VarcharType.VARCHAR, VarcharType.VARCHAR, BooleanType.BOOLEAN,
-                VarcharType.VARCHAR, BigintType.BIGINT, VarcharType.VARCHAR));
+        BlockBuilders blockBuilders = createBlockBuilders(ImmutableList.of(VarcharType.VARCHAR, VarcharType.VARCHAR,
+                BooleanType.BOOLEAN, VarcharType.VARCHAR, BigintType.BIGINT, VarcharType.VARCHAR));
 
-        addStringRowField(cityResponse.get().getCountry().getIsoCode());
-        addStringRowField(cityResponse.get().getCountry().getName());
-        addBooleanRowField(cityResponse.get().getCountry().isInEuropeanUnion());
-        addStringRowField(cityResponse.get().getCity().getName());
-        addBigIntRowField(cityResponse.get().getCity().getGeoNameId());
-        addStringRowField(cityResponse.get().getPostal().getCode());
+        addStringRowField(blockBuilders, cityResponse.get().getCountry().getIsoCode());
+        addStringRowField(blockBuilders, cityResponse.get().getCountry().getName());
+        addBooleanRowField(blockBuilders, cityResponse.get().getCountry().isInEuropeanUnion());
+        addStringRowField(blockBuilders, cityResponse.get().getCity().getName());
+        addBigIntRowField(blockBuilders, cityResponse.get().getCity().getGeoNameId());
+        addStringRowField(blockBuilders, cityResponse.get().getPostal().getCode());
 
-        return finishBlock();
+        return finishBlock(blockBuilders);
     }
 
     @ScalarFunction("maxmind_city_full_json")
@@ -181,14 +192,15 @@ public class MaxmindFunctions
             return null;
         }
 
-        createBlockBuilders(ImmutableList.of(VarcharType.VARCHAR, VarcharType.VARCHAR, BigintType.BIGINT, VarcharType.VARCHAR));
+        BlockBuilders blockBuilders = createBlockBuilders(ImmutableList.of(
+                VarcharType.VARCHAR, VarcharType.VARCHAR, BigintType.BIGINT, VarcharType.VARCHAR));
 
-        addStringRowField(ispResponse.get().getIsp());
-        addStringRowField(ispResponse.get().getOrganization());
-        addBigIntRowField(ispResponse.get().getAutonomousSystemNumber());
-        addStringRowField(ispResponse.get().getAutonomousSystemOrganization());
+        addStringRowField(blockBuilders, ispResponse.get().getIsp());
+        addStringRowField(blockBuilders, ispResponse.get().getOrganization());
+        addBigIntRowField(blockBuilders, ispResponse.get().getAutonomousSystemNumber());
+        addStringRowField(blockBuilders, ispResponse.get().getAutonomousSystemOrganization());
 
-        return finishBlock();
+        return finishBlock(blockBuilders);
     }
 
     @ScalarFunction("maxmind_isp_full_json")
@@ -208,45 +220,47 @@ public class MaxmindFunctions
         return Slices.utf8Slice(ispResponse.get().toJson());
     }
 
-    private static void createBlockBuilders(List<Type> types)
+    private static BlockBuilders createBlockBuilders(List<Type> types)
     {
-        rowType = RowType.anonymous(types);
-        pageBuilder = new PageBuilder(ImmutableList.of(rowType));
-        blockBuilder = pageBuilder.getBlockBuilder(0);
-        entryBlockBuilder = blockBuilder.beginBlockEntry();
+        RowType rowType = RowType.anonymous(types);
+        PageBuilder pageBuilder = new PageBuilder(ImmutableList.of(rowType));
+        BlockBuilder blockBuilder = pageBuilder.getBlockBuilder(0);
+        BlockBuilder entryBlockBuilder = blockBuilder.beginBlockEntry();
+
+        return new BlockBuilders(rowType, pageBuilder, blockBuilder, entryBlockBuilder);
     }
 
-    private static Block finishBlock()
+    private static Block finishBlock(BlockBuilders blockBuilders)
     {
-        blockBuilder.closeEntry();
-        pageBuilder.declarePosition();
+        blockBuilders.blockBuilder.closeEntry();
+        blockBuilders.pageBuilder.declarePosition();
 
-        return rowType.getObject(blockBuilder, blockBuilder.getPositionCount() - 1);
+        return blockBuilders.rowType.getObject(blockBuilders.blockBuilder, blockBuilders.blockBuilder.getPositionCount() - 1);
     }
 
-    private static void addStringRowField(String value)
+    private static void addStringRowField(BlockBuilders blockBuilders, String value)
     {
         if (value == null) {
-            entryBlockBuilder.appendNull();
+            blockBuilders.entryBlockBuilder.appendNull();
         }
         else {
-            VarcharType.VARCHAR.writeString(entryBlockBuilder, value);
+            VarcharType.VARCHAR.writeString(blockBuilders.entryBlockBuilder, value);
         }
     }
 
-    private static void addBigIntRowField(Integer value)
+    private static void addBigIntRowField(BlockBuilders blockBuilders, Integer value)
     {
         if (value == null) {
-            entryBlockBuilder.appendNull();
+            blockBuilders.entryBlockBuilder.appendNull();
         }
         else {
-            BigintType.BIGINT.writeLong(entryBlockBuilder, (long) value);
+            BigintType.BIGINT.writeLong(blockBuilders.entryBlockBuilder, (long) value);
         }
     }
 
-    private static void addBooleanRowField(boolean value)
+    private static void addBooleanRowField(BlockBuilders blockBuilders, boolean value)
     {
-        BooleanType.BOOLEAN.writeBoolean(entryBlockBuilder, value);
+        BooleanType.BOOLEAN.writeBoolean(blockBuilders.entryBlockBuilder, value);
     }
 
     private static Optional<CityResponse> getCityResponse(InetAddress ipAddress)
