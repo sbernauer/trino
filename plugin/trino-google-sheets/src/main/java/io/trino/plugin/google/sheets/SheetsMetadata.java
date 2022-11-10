@@ -15,23 +15,31 @@ package io.trino.plugin.google.sheets;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import io.airlift.slice.Slice;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ColumnMetadata;
+import io.trino.spi.connector.ConnectorInsertTableHandle;
 import io.trino.spi.connector.ConnectorMetadata;
+import io.trino.spi.connector.ConnectorOutputMetadata;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableProperties;
+import io.trino.spi.connector.RetryMode;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.connector.SchemaTablePrefix;
 import io.trino.spi.connector.TableNotFoundException;
+import io.trino.spi.statistics.ComputedStatistics;
 
 import javax.inject.Inject;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.Iterables.getOnlyElement;
@@ -151,5 +159,31 @@ public class SheetsMetadata
     public ConnectorTableProperties getTableProperties(ConnectorSession session, ConnectorTableHandle table)
     {
         return new ConnectorTableProperties();
+    }
+
+    @Override
+    public ConnectorInsertTableHandle beginInsert(ConnectorSession session, ConnectorTableHandle tableHandle, List<ColumnHandle> columns, RetryMode retryMode)
+    {
+        SheetsTableHandle sheetsTableHandle = (SheetsTableHandle) tableHandle;
+        return new SheetsInsertTableHandle(sheetsTableHandle.getSchemaName(),
+                sheetsTableHandle.getTableName(), buildColumnHandles(sheetsTableHandle));
+    }
+
+    @Override
+    public Optional<ConnectorOutputMetadata> finishInsert(ConnectorSession session, ConnectorInsertTableHandle insertHandle, Collection<Slice> fragments, Collection<ComputedStatistics> computedStatistics)
+    {
+        return Optional.empty();
+    }
+
+    private List<SheetsColumnHandle> buildColumnHandles(SheetsTableHandle sheetsTableHandle)
+    {
+        AtomicInteger counter = new AtomicInteger(0);
+        Optional<SheetsTable> table = sheetsClient.getTable(sheetsTableHandle.getTableName());
+        if (table.isEmpty()) {
+            throw new TableNotFoundException(sheetsTableHandle.toSchemaTableName());
+        }
+        return table.get().getColumnsMetadata().stream()
+                .map(m -> new SheetsColumnHandle(m.getName(), m.getType(), counter.getAndIncrement()))
+                .collect(Collectors.toList());
     }
 }

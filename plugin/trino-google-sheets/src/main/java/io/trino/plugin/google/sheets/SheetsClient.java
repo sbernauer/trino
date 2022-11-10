@@ -19,14 +19,18 @@ import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.sheets.v4.Sheets;
 import com.google.api.services.sheets.v4.SheetsScopes;
+import com.google.api.services.sheets.v4.model.AppendValuesResponse;
+import com.google.api.services.sheets.v4.model.ValueRange;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
+import io.trino.collect.cache.EvictableCacheBuilder;
 import io.trino.collect.cache.NonEvictableLoadingCache;
 import io.trino.spi.TrinoException;
 import io.trino.spi.type.VarcharType;
@@ -49,6 +53,7 @@ import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.trino.collect.cache.SafeCaches.buildNonEvictableCache;
 import static io.trino.plugin.google.sheets.SheetsErrorCode.SHEETS_BAD_CREDENTIALS_ERROR;
+import static io.trino.plugin.google.sheets.SheetsErrorCode.SHEETS_INSERT_ERROR;
 import static io.trino.plugin.google.sheets.SheetsErrorCode.SHEETS_METASTORE_ERROR;
 import static io.trino.plugin.google.sheets.SheetsErrorCode.SHEETS_TABLE_LOAD_ERROR;
 import static io.trino.plugin.google.sheets.SheetsErrorCode.SHEETS_UNKNOWN_TABLE_ERROR;
@@ -62,11 +67,16 @@ public class SheetsClient
 
     private static final String APPLICATION_NAME = "trino google sheets integration";
     private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
+    private static final String COLUMN_TYPE_CACHE_KEY = "_column_type_";
+    private static final String INSERT_VALUE_OPTION = "RAW";
+    private static final String DELIMITER_HASH = "#";
+    private static final String DELIMITER_COMMA = ",";
+    private static final String DELIMITER_EQUALS = "=";
 
-    private static final List<String> SCOPES = ImmutableList.of(SheetsScopes.SPREADSHEETS_READONLY);
+    private static final List<String> SCOPES = ImmutableList.of(SheetsScopes.SPREADSHEETS);
 
     private final NonEvictableLoadingCache<String, Optional<String>> tableSheetMappingCache;
-    private final NonEvictableLoadingCache<String, List<List<Object>>> sheetDataCache;
+    private final LoadingCache<String, List<List<Object>>> sheetDataCache;
 
     private final String metadataSheetId;
     private final String credentialsFilePath;
@@ -91,7 +101,7 @@ public class SheetsClient
         long maxCacheSize = config.getSheetsDataMaxCacheSize();
 
         this.tableSheetMappingCache = buildNonEvictableCache(
-                newCacheBuilder(expiresAfterWriteMillis, maxCacheSize),
+                CacheBuilder.newBuilder().expireAfterWrite(expiresAfterWriteMillis, MILLISECONDS).maximumSize(maxCacheSize),
                 new CacheLoader<>()
                 {
                     @Override
@@ -107,9 +117,10 @@ public class SheetsClient
                     }
                 });
 
-        this.sheetDataCache = buildNonEvictableCache(
-                newCacheBuilder(expiresAfterWriteMillis, maxCacheSize),
-                CacheLoader.from(this::readAllValuesFromSheetExpression));
+        this.sheetDataCache = EvictableCacheBuilder.newBuilder()
+                .expireAfterWrite(expiresAfterWriteMillis, MILLISECONDS)
+                .maximumSize(maxCacheSize)
+                .build(CacheLoader.from(this::readAllValuesFromSheetExpression));
     }
 
     public Optional<SheetsTable> getTable(String tableName)
@@ -128,7 +139,14 @@ public class SheetsClient
                     columnValue = "column_" + ++count;
                 }
                 columnNames.add(columnValue);
-                columns.add(new SheetsColumn(columnValue, VarcharType.VARCHAR));
+                Optional<String> columType = tableSheetMappingCache.getIfPresent(tableName + COLUMN_TYPE_CACHE_KEY + columnValue);
+                if (columType != null && columType.isPresent()) {
+                    columns.add(new SheetsColumn(columnValue, SheetsHelper.getType(columType.get())));
+                }
+                else {
+                    // If no type was specified for this column in the metadata table VARCHAR type is used to read the data
+                    columns.add(new SheetsColumn(columnValue, VarcharType.VARCHAR));
+                }
             }
             List<List<String>> dataValues = values.subList(1, values.size()); // removing header info
             return Optional.of(new SheetsTable(tableName, columns.build(), dataValues));
@@ -157,8 +175,7 @@ public class SheetsClient
     public List<List<Object>> readAllValues(String tableName)
     {
         try {
-            String sheetExpression = tableSheetMappingCache.getUnchecked(tableName)
-                    .orElseThrow(() -> new TrinoException(SHEETS_UNKNOWN_TABLE_ERROR, "Sheet expression not found for table " + tableName));
+            String sheetExpression = getCachedSheetExpressionForTable(tableName);
             return sheetDataCache.getUnchecked(sheetExpression);
         }
         catch (UncheckedExecutionException e) {
@@ -193,6 +210,16 @@ public class SheetsClient
                 String tableId = String.valueOf(data.get(i).get(0));
                 String sheetId = String.valueOf(data.get(i).get(1));
                 tableSheetMap.put(tableId.toLowerCase(Locale.ENGLISH), Optional.of(sheetId));
+
+                if (data.get(i).size() >= 5) {
+                    String[] tableColumnTypes = String.valueOf(data.get(i).get(4)).split(DELIMITER_COMMA);
+                    for (String tableColumnType : tableColumnTypes) {
+                        String[] split = tableColumnType.split(DELIMITER_EQUALS);
+                        String columnName = split[0];
+                        String columnType = split[1];
+                        tableSheetMappingCache.put(tableId + COLUMN_TYPE_CACHE_KEY + columnName, Optional.of(columnType));
+                    }
+                }
             }
         }
         return tableSheetMap.buildOrThrow();
@@ -208,26 +235,64 @@ public class SheetsClient
         }
     }
 
+    public String getCachedSheetExpressionForTable(String tableName)
+    {
+        Optional<String> sheetExpression = tableSheetMappingCache.getUnchecked(tableName);
+        if (sheetExpression.isEmpty()) {
+            throw new TrinoException(SHEETS_UNKNOWN_TABLE_ERROR, "Sheet expression not found for table " + tableName);
+        }
+        return sheetExpression.get();
+    }
+
+    public String[] extractSheetIdAndRange(String sheetExpression)
+    {
+        // by default loading up to 10k rows from the first tab of the sheet
+        String range = "$1:$10000";
+        String[] tableOptions = sheetExpression.split(DELIMITER_HASH);
+        String sheetId = tableOptions[0];
+        if (tableOptions.length > 1) {
+            range = tableOptions[1];
+        }
+
+        return new String[] {sheetId, range};
+    }
+
     private List<List<Object>> readAllValuesFromSheetExpression(String sheetExpression)
     {
+        String[] sheetIdAndRange = extractSheetIdAndRange(sheetExpression);
         try {
-            // by default loading up to 10k rows from the first tab of the sheet
-            String defaultRange = "$1:$10000";
-            String[] tableOptions = sheetExpression.split("#");
-            String sheetId = tableOptions[0];
-            if (tableOptions.length > 1) {
-                defaultRange = tableOptions[1];
-            }
-            log.debug("Accessing sheet id [%s] with range [%s]", sheetId, defaultRange);
-            return sheetsService.spreadsheets().values().get(sheetId, defaultRange).execute().getValues();
+            log.debug("Accessing sheet id [%s] with range [%s]", sheetIdAndRange[0], sheetIdAndRange[1]);
+            return sheetsService.spreadsheets().values().get(sheetIdAndRange[0], sheetIdAndRange[1]).execute().getValues();
         }
         catch (IOException e) {
             throw new TrinoException(SHEETS_UNKNOWN_TABLE_ERROR, "Failed reading data from sheet: " + sheetExpression, e);
         }
     }
 
-    private static CacheBuilder<Object, Object> newCacheBuilder(long expiresAfterWriteMillis, long maximumSize)
+    public Integer insertIntoSheet(String sheetExpression, List<List<Object>> rows)
     {
-        return CacheBuilder.newBuilder().expireAfterWrite(expiresAfterWriteMillis, MILLISECONDS).maximumSize(maximumSize);
+        ValueRange body = new ValueRange().setValues(rows);
+        AppendValuesResponse result;
+        String[] sheetIdAndRange = extractSheetIdAndRange(sheetExpression);
+        try {
+            result = sheetsService.spreadsheets().values().append(sheetIdAndRange[0], sheetIdAndRange[1], body)
+                    .setValueInputOption(INSERT_VALUE_OPTION)
+                    .execute();
+        }
+        catch (IOException e) {
+            throw new TrinoException(SHEETS_INSERT_ERROR, "Error inserting data to sheet: ", e);
+        }
+
+        // Flush the cache contents for the table that was written to.
+        // This is a best-effort solution, since the Google Sheets API seems to be eventually consistent.
+        // If the table written to will be queried directly afterwards the inserts might not have been propagated yet
+        // and the users needs to wait till the cached version alters out.
+        flushSheetDataCache(sheetExpression);
+        return result.getUpdates().getUpdatedCells();
+    }
+
+    private void flushSheetDataCache(String sheetExpression)
+    {
+        sheetDataCache.invalidate(sheetExpression);
     }
 }
