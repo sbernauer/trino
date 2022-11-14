@@ -69,9 +69,9 @@ public class SheetsClient
     private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
     private static final String COLUMN_TYPE_CACHE_KEY = "_column_type_";
     private static final String INSERT_VALUE_OPTION = "RAW";
-    private static final String DELIMITER_HASH = "#";
-    private static final String DELIMITER_COMMA = ",";
-    private static final String DELIMITER_EQUALS = "=";
+    static final String DELIMITER_HASH = "#";
+    static final String DELIMITER_COMMA = ",";
+    static final String DELIMITER_EQUALS = "=";
 
     private static final List<String> SCOPES = ImmutableList.of(SheetsScopes.SPREADSHEETS);
 
@@ -244,25 +244,12 @@ public class SheetsClient
         return sheetExpression.get();
     }
 
-    public String[] extractSheetIdAndRange(String sheetExpression)
-    {
-        // by default loading up to 10k rows from the first tab of the sheet
-        String range = "$1:$10000";
-        String[] tableOptions = sheetExpression.split(DELIMITER_HASH);
-        String sheetId = tableOptions[0];
-        if (tableOptions.length > 1) {
-            range = tableOptions[1];
-        }
-
-        return new String[] {sheetId, range};
-    }
-
     private List<List<Object>> readAllValuesFromSheetExpression(String sheetExpression)
     {
-        String[] sheetIdAndRange = extractSheetIdAndRange(sheetExpression);
+        SheetsSheetIdAndRange sheetIdAndRange = new SheetsSheetIdAndRange(sheetExpression);
         try {
-            log.debug("Accessing sheet id [%s] with range [%s]", sheetIdAndRange[0], sheetIdAndRange[1]);
-            return sheetsService.spreadsheets().values().get(sheetIdAndRange[0], sheetIdAndRange[1]).execute().getValues();
+            log.debug("Accessing sheet id [%s] with range [%s]", sheetIdAndRange.getSheetId(), sheetIdAndRange.getRange());
+            return sheetsService.spreadsheets().values().get(sheetIdAndRange.getSheetId(), sheetIdAndRange.getRange()).execute().getValues();
         }
         catch (IOException e) {
             throw new TrinoException(SHEETS_UNKNOWN_TABLE_ERROR, "Failed reading data from sheet: " + sheetExpression, e);
@@ -273,9 +260,9 @@ public class SheetsClient
     {
         ValueRange body = new ValueRange().setValues(rows);
         AppendValuesResponse result;
-        String[] sheetIdAndRange = extractSheetIdAndRange(sheetExpression);
+        SheetsSheetIdAndRange sheetIdAndRange = new SheetsSheetIdAndRange(sheetExpression);
         try {
-            result = sheetsService.spreadsheets().values().append(sheetIdAndRange[0], sheetIdAndRange[1], body)
+            result = sheetsService.spreadsheets().values().append(sheetIdAndRange.getSheetId(), sheetIdAndRange.getRange(), body)
                     .setValueInputOption(INSERT_VALUE_OPTION)
                     .execute();
         }
