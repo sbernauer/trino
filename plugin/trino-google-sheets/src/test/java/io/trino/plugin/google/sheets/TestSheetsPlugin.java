@@ -33,7 +33,7 @@ import static org.testng.Assert.assertNotNull;
 
 public class TestSheetsPlugin
 {
-    static final String TEST_METADATA_SHEET_ID = "1Es4HhWALUQjoa-bQh4a8B5HROz7dpGMfq_HbfoaW5LM#Tables";
+    static final String TEST_METADATA_SHEET_ID = "1eKgxd877iah7rFvtcphqSU1z5eA3eYKHKsYkDmErbwo";
 
     static String getTestCredentialsPath()
             throws Exception

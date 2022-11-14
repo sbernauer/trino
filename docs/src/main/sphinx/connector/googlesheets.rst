@@ -71,16 +71,7 @@ Column           Mandatory    Description
 ``Column types`` no           Specify types of the columns. See `Column types`_
 ================ ============ =================================================
 
-A sample metadata table could look like
-
-============= ========================================================== ======== =========================================================== ==================================
-Table Name    Sheet ID                                                   Owner    Notes                                                       Colum types
-============= ========================================================== ======== =========================================================== ==================================
-customers     1234                                                                Will fetch 10k lines from first tab
-sales_data    1Es4HhWALUQjoa-bQh4a8B5HROz7dpGMfq_HbfoaW5LM#Sales data    Bob      Sales data of the last year residing in tab "Sales data"    department=varchar,sales=bigint
-============= ========================================================== ======== =========================================================== ==================================
-
-See this `example sheet <https://docs.google.com/spreadsheets/d/1Es4HhWALUQjoa-bQh4a8B5HROz7dpGMfq_HbfoaW5LM>`_
+See this `example sheet <https://docs.google.com/spreadsheets/d/1eKgxd877iah7rFvtcphqSU1z5eA3eYKHKsYkDmErbwo>`_
 as a reference.
 
 The metadata sheet must be shared with the service account user,
@@ -93,7 +84,7 @@ Sheet ID
 ^^^^^^^^
 Sheet ID of the Google sheet.
 You can extract this from the URL when editing a sheet in a browser.
-Given the URL https://docs.google.com/spreadsheets/d/1Es4HhWALUQjoa-bQh4a8B5HROz7dpGMfq_HbfoaW5LM/edit#gid=0, the sheet id is ``1Es4HhWALUQjoa-bQh4a8B5HROz7dpGMfq_HbfoaW5LM``.
+Given the URL https://docs.google.com/spreadsheets/d/1eKgxd877iah7rFvtcphqSU1z5eA3eYKHKsYkDmErbwo/edit#gid=0, the sheet id is ``1eKgxd877iah7rFvtcphqSU1z5eA3eYKHKsYkDmErbwo``.
 
 As a default, this connector will fetch 10,000 rows from the first tab in the sheet.
 You need to prepend the tab name after the sheet ID separated with ``#`` in one of the following cases:

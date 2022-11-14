@@ -44,9 +44,9 @@ public class TestGoogleSheets
     @Test
     public void testDescTable()
     {
-        assertQuery("desc number_text", "SELECT * FROM (VALUES('number','varchar','',''), ('text','varchar','',''))");
-        assertQuery("desc metadata_table", "SELECT * FROM (VALUES('table name','varchar','',''), ('sheetid_sheetname','varchar','',''), "
-                + "('owner','varchar','',''), ('notes','varchar','',''))");
+        assertQuery("desc number_text", "SELECT * FROM (VALUES('number','bigint','',''), ('text','varchar','',''))");
+        assertQuery("desc metadata_table", "SELECT * FROM (VALUES('table name','varchar','',''), ('sheet id','varchar','',''), "
+                + "('owner','varchar','',''), ('notes','varchar','',''), ('column types','varchar','',''))");
     }
 
     @Test
