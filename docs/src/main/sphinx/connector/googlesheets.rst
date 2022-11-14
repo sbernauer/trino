@@ -96,7 +96,11 @@ You can extract this from the URL when editing a sheet in a browser.
 Given the URL https://docs.google.com/spreadsheets/d/1Es4HhWALUQjoa-bQh4a8B5HROz7dpGMfq_HbfoaW5LM/edit#gid=0, the sheet id is ``1Es4HhWALUQjoa-bQh4a8B5HROz7dpGMfq_HbfoaW5LM``.
 
 As a default, this connector will fetch 10,000 rows from the first tab in the sheet.
-If you need to read more rows or rows from a different tab, you can prepend that tab after the sheet ID separated with ``#``.
+You need to prepend the tab name after the sheet ID separated with ``#`` in one of the following cases:
+
+* Read more than 10,000 rows
+* Read from a different tab withing the sheet
+
 This could for example look like ``1Es4HhWALUQjoa-bQh4a8B5HROz7dpGMfq_HbfoaW5LM#Customer Orders``.
 
 Column types
