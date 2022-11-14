@@ -54,7 +54,7 @@ public class SheetsRecordCursor
                 inputLength += obj.length();
             }
         }
-        totalBytes = inputLength;
+        this.totalBytes = inputLength;
     }
 
     @Override
