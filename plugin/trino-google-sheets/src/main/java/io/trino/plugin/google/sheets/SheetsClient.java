@@ -285,7 +285,7 @@ public class SheetsClient
 
         // Flush the cache contents for the table that was written to.
         // This is a best-effort solution, since the Google Sheets API seems to be eventually consistent.
-        // If the table written to will be queried directly afterwards the inserts might not have been propagated yet
+        // If the table written to will be queried directly afterwards the inserts might not have been propagated yet.
         // and the users needs to wait till the cached version alters out.
         flushSheetDataCache(sheetExpression);
         return result.getUpdates().getUpdatedCells();
