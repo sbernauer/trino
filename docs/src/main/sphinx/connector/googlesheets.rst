@@ -121,6 +121,9 @@ If the table is accessed imitatively after the write, querying the Google Sheets
 In that case the old version of the table will be read and cached for the configured amount of time.
 So it might take some time for the written changes to propagate properly.
 
+Please keep in mind that the Google Sheets API has `usage limits <https://developers.google.com/sheets/api/limits>`_, which limit the speed of inserting data.
+You might run into timeouts (which you can increase using the configuration properties) or ``503: The service is currently unavailable`` errors.
+
 Caching
 -------
 
