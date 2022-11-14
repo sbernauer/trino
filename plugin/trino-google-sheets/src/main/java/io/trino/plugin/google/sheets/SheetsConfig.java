@@ -30,6 +30,9 @@ public class SheetsConfig
     private String metadataSheetId;
     private int sheetsDataMaxCacheSize = 1000;
     private Duration sheetsDataExpireAfterWrite = new Duration(5, TimeUnit.MINUTES);
+    private Duration connectionTimeout = new Duration(5, TimeUnit.MINUTES);
+    private Duration readTimeout = new Duration(5, TimeUnit.MINUTES);
+    private Duration writeTimeout = new Duration(5, TimeUnit.MINUTES);
 
     @NotNull
     @FileExists
@@ -85,6 +88,48 @@ public class SheetsConfig
     public SheetsConfig setSheetsDataExpireAfterWrite(Duration sheetsDataExpireAfterWriteMinutes)
     {
         this.sheetsDataExpireAfterWrite = sheetsDataExpireAfterWriteMinutes;
+        return this;
+    }
+
+    @MinDuration("10s")
+    public Duration getConnectionTimeout()
+    {
+        return connectionTimeout;
+    }
+
+    @Config("connection-timeout")
+    @ConfigDescription("Timeout when connection to Google Sheets API")
+    public SheetsConfig setConnectionTimeout(Duration connectionTimeout)
+    {
+        this.connectionTimeout = connectionTimeout;
+        return this;
+    }
+
+    @MinDuration("1m")
+    public Duration getReadTimeout()
+    {
+        return readTimeout;
+    }
+
+    @Config("read-timeout")
+    @ConfigDescription("Timeout when reading from Google Sheets API")
+    public SheetsConfig setReadTimeout(Duration readTimeout)
+    {
+        this.readTimeout = readTimeout;
+        return this;
+    }
+
+    @MinDuration("1m")
+    public Duration getWriteTimeout()
+    {
+        return writeTimeout;
+    }
+
+    @Config("write-timeout")
+    @ConfigDescription("Timeout when writing to Google Sheets API")
+    public SheetsConfig setWriteTimeout(Duration writeTimeout)
+    {
+        this.writeTimeout = writeTimeout;
         return this;
     }
 }

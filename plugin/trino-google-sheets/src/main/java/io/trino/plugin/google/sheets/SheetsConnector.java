@@ -87,4 +87,10 @@ public class SheetsConnector
     {
         lifeCycleManager.stop();
     }
+
+    @Override
+    public boolean isSingleStatementWritesOnly()
+    {
+        return true;
+    }
 }

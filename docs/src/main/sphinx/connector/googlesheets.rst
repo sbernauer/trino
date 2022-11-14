@@ -33,6 +33,9 @@ Property name                       Description
 ``metadata-sheet-id``               Sheet ID of the spreadsheet, that contains the table mapping
 ``sheets-data-max-cache-size``      Maximum number of spreadsheets to cache, defaults to ``1000``
 ``sheets-data-expire-after-write``  How long to cache spreadsheet data or metadata, defaults to ``5m``
+``connection-timeout``              Timeout when connection to Google Sheets API, defaults to ``5m``
+``read-timeout``                    Timeout when reading from Google Sheets API, defaults to ``5m``
+``write-timeout``                   Timeout when writing to Google Sheets API, defaults to ``5m``
 =================================== =====================================================================
 
 Credentials

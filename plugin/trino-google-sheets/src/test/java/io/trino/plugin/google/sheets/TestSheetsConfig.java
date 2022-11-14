@@ -36,7 +36,10 @@ public class TestSheetsConfig
                 .setCredentialsFilePath(null)
                 .setMetadataSheetId(null)
                 .setSheetsDataMaxCacheSize(1000)
-                .setSheetsDataExpireAfterWrite(new Duration(5, TimeUnit.MINUTES)));
+                .setSheetsDataExpireAfterWrite(new Duration(5, TimeUnit.MINUTES))
+                .setConnectionTimeout(new Duration(5, TimeUnit.MINUTES))
+                .setReadTimeout(new Duration(5, TimeUnit.MINUTES))
+                .setWriteTimeout(new Duration(5, TimeUnit.MINUTES)));
     }
 
     @Test
@@ -50,13 +53,19 @@ public class TestSheetsConfig
                 .put("metadata-sheet-id", "foo_bar_sheet_id#Sheet1")
                 .put("sheets-data-max-cache-size", "2000")
                 .put("sheets-data-expire-after-write", "10m")
+                .put("connection-timeout", "11m")
+                .put("read-timeout", "12m")
+                .put("write-timeout", "13m")
                 .buildOrThrow();
 
         SheetsConfig expected = new SheetsConfig()
                 .setCredentialsFilePath(credentialsFile.toString())
                 .setMetadataSheetId("foo_bar_sheet_id#Sheet1")
                 .setSheetsDataMaxCacheSize(2000)
-                .setSheetsDataExpireAfterWrite(new Duration(10, TimeUnit.MINUTES));
+                .setSheetsDataExpireAfterWrite(new Duration(10, TimeUnit.MINUTES))
+                .setConnectionTimeout(new Duration(11, TimeUnit.MINUTES))
+                .setReadTimeout(new Duration(12, TimeUnit.MINUTES))
+                .setWriteTimeout(new Duration(13, TimeUnit.MINUTES));
 
         assertFullMapping(properties, expected);
     }

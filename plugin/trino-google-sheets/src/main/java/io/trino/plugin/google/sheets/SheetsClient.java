@@ -15,6 +15,7 @@ package io.trino.plugin.google.sheets;
 
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
+import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.client.json.jackson2.JacksonFactory;
 import com.google.api.services.sheets.v4.Sheets;
@@ -69,6 +70,7 @@ public class SheetsClient
     private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
     private static final String COLUMN_TYPE_CACHE_KEY = "_column_type_";
     private static final String INSERT_VALUE_OPTION = "RAW";
+    private static final String INSERT_DATA_OPTION = "INSERT_ROWS";
     static final String DELIMITER_HASH = "#";
     static final String DELIMITER_COMMA = ",";
     static final String DELIMITER_EQUALS = "=";
@@ -92,7 +94,9 @@ public class SheetsClient
         this.credentialsFilePath = config.getCredentialsFilePath();
 
         try {
-            this.sheetsService = new Sheets.Builder(newTrustedTransport(), JSON_FACTORY, getCredentials()).setApplicationName(APPLICATION_NAME).build();
+            this.sheetsService = new Sheets.Builder(newTrustedTransport(), JSON_FACTORY, setHttpTimeouts(getCredentials(), config))
+                    .setApplicationName(APPLICATION_NAME)
+                    .build();
         }
         catch (GeneralSecurityException | IOException e) {
             throw new TrinoException(SHEETS_BAD_CREDENTIALS_ERROR, e);
@@ -121,6 +125,16 @@ public class SheetsClient
                 .expireAfterWrite(expiresAfterWriteMillis, MILLISECONDS)
                 .maximumSize(maxCacheSize)
                 .build(CacheLoader.from(this::readAllValuesFromSheetExpression));
+    }
+
+    private HttpRequestInitializer setHttpTimeouts(HttpRequestInitializer requestInitializer, SheetsConfig config)
+    {
+        return httpRequest -> {
+            requestInitializer.initialize(httpRequest);
+            httpRequest.setConnectTimeout((int) config.getConnectionTimeout().toMillis());
+            httpRequest.setReadTimeout((int) config.getReadTimeout().toMillis());
+            httpRequest.setWriteTimeout((int) config.getWriteTimeout().toMillis());
+        };
     }
 
     public Optional<SheetsTable> getTable(String tableName)
@@ -264,6 +278,7 @@ public class SheetsClient
         try {
             result = sheetsService.spreadsheets().values().append(sheetIdAndRange.getSheetId(), sheetIdAndRange.getRange(), body)
                     .setValueInputOption(INSERT_VALUE_OPTION)
+                    .setInsertDataOption(INSERT_DATA_OPTION)
                     .execute();
         }
         catch (IOException e) {
