@@ -28,7 +28,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
-import io.airlift.units.Duration;
 import io.trino.collect.cache.NonEvictableLoadingCache;
 import io.trino.spi.TrinoException;
 import io.trino.spi.type.VarcharType;
@@ -85,7 +84,7 @@ public class SheetsClient
         this.metadataSheetId = config.getMetadataSheetId();
 
         try {
-            this.sheetsService = new Sheets.Builder(newTrustedTransport(), JSON_FACTORY, setTimeout(getCredentials(config), config.getReadTimeout())).setApplicationName(APPLICATION_NAME).build();
+            this.sheetsService = new Sheets.Builder(newTrustedTransport(), JSON_FACTORY, setTimeout(getCredentials(config), config)).setApplicationName(APPLICATION_NAME).build();
         }
         catch (GeneralSecurityException | IOException e) {
             throw new TrinoException(SHEETS_BAD_CREDENTIALS_ERROR, e);
@@ -254,12 +253,17 @@ public class SheetsClient
         return CacheBuilder.newBuilder().expireAfterWrite(expiresAfterWriteMillis, MILLISECONDS).maximumSize(maximumSize);
     }
 
-    private static HttpRequestInitializer setTimeout(HttpRequestInitializer requestInitializer, Duration readTimeout)
+    private HttpRequestInitializer setTimeout(HttpRequestInitializer requestInitializer, SheetsConfig config)
     {
-        requireNonNull(readTimeout, "readTimeout is null");
+        requireNonNull(config.getConnectionTimeout(), "connectionTimeout is null");
+        requireNonNull(config.getReadTimeout(), "readTimeout is null");
+        requireNonNull(config.getWriteTimeout(), "writeTimeout is null");
+
         return httpRequest -> {
             requestInitializer.initialize(httpRequest);
-            httpRequest.setReadTimeout(toIntExact(readTimeout.toMillis()));
+            httpRequest.setConnectTimeout(toIntExact(config.getConnectionTimeout().toMillis()));
+            httpRequest.setReadTimeout(toIntExact(config.getReadTimeout().toMillis()));
+            httpRequest.setWriteTimeout(toIntExact(config.getWriteTimeout().toMillis()));
         };
     }
 }
