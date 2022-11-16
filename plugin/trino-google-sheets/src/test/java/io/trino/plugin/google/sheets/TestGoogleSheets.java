@@ -44,25 +44,25 @@ public class TestGoogleSheets
     @Test
     public void testDescTable()
     {
-        assertQuery("desc number_text", "SELECT * FROM (VALUES('number','varchar','',''), ('text','varchar','',''))");
-        assertQuery("desc metadata_table", "SELECT * FROM (VALUES('table name','varchar','',''), ('sheetid_sheetname','varchar','',''), "
-                + "('owner','varchar','',''), ('notes','varchar','',''))");
+        assertQuery("desc number_text", "SELECT * FROM (VALUES('number','bigint','',''), ('text','varchar','',''))");
+        assertQuery("desc metadata_table", "SELECT * FROM (VALUES('table name','varchar','',''), ('sheet id','varchar','',''), "
+                + "('owner','varchar','',''), ('notes','varchar','',''), ('column types','varchar','',''))");
     }
 
     @Test
     public void testSelectFromTable()
     {
         assertQuery("SELECT count(*) FROM number_text", "SELECT 5");
-        assertQuery("SELECT number FROM number_text", "SELECT * FROM (VALUES '1','2','3','4','5')");
+        assertQuery("SELECT number FROM number_text", "SELECT * FROM (VALUES 1,2,3,4,5)");
         assertQuery("SELECT text FROM number_text", "SELECT * FROM (VALUES 'one','two','three','four','five')");
-        assertQuery("SELECT * FROM number_text", "SELECT * FROM (VALUES ('1','one'), ('2','two'), ('3','three'), ('4','four'), ('5','five'))");
+        assertQuery("SELECT * FROM number_text", "SELECT * FROM (VALUES (1,'one'), (2,'two'), (3,'three'), (4,'four'), (5,'five'))");
     }
 
     @Test
     public void testSelectFromTableIgnoreCase()
     {
         assertQuery("SELECT count(*) FROM NUMBER_TEXT", "SELECT 5");
-        assertQuery("SELECT number FROM Number_Text", "SELECT * FROM (VALUES '1','2','3','4','5')");
+        assertQuery("SELECT number FROM Number_Text", "SELECT * FROM (VALUES 1,2,3,4,5)");
     }
 
     @Test

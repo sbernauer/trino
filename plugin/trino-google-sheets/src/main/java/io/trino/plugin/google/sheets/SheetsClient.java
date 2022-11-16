@@ -30,6 +30,7 @@ import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
 import io.trino.collect.cache.NonEvictableLoadingCache;
 import io.trino.spi.TrinoException;
+import io.trino.spi.type.Type;
 import io.trino.spi.type.VarcharType;
 
 import javax.inject.Inject;
@@ -55,6 +56,7 @@ import static io.trino.plugin.google.sheets.SheetsErrorCode.SHEETS_BAD_CREDENTIA
 import static io.trino.plugin.google.sheets.SheetsErrorCode.SHEETS_METASTORE_ERROR;
 import static io.trino.plugin.google.sheets.SheetsErrorCode.SHEETS_TABLE_LOAD_ERROR;
 import static io.trino.plugin.google.sheets.SheetsErrorCode.SHEETS_UNKNOWN_TABLE_ERROR;
+import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 import static java.lang.Math.toIntExact;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.requireNonNull;
@@ -66,6 +68,9 @@ public class SheetsClient
 
     private static final String APPLICATION_NAME = "trino google sheets integration";
     private static final JsonFactory JSON_FACTORY = JacksonFactory.getDefaultInstance();
+    private static final String COLUMN_TYPE_CACHE_KEY = "_column_type_";
+    private static final String DELIMITER_COMMA = ",";
+    private static final String DELIMITER_EQUALS = "=";
 
     private static final List<String> SCOPES = ImmutableList.of(SheetsScopes.SPREADSHEETS_READONLY);
 
@@ -130,7 +135,16 @@ public class SheetsClient
                     columnValue = "column_" + ++count;
                 }
                 columnNames.add(columnValue);
-                columns.add(new SheetsColumn(columnValue, VarcharType.VARCHAR));
+                Optional<String> columType = tableSheetMappingCache.getIfPresent(tableName + COLUMN_TYPE_CACHE_KEY + columnValue);
+                if (columType != null && columType.isPresent()) {
+                    String finalColumnValue = columnValue;
+                    Type trinoColumType = SheetsTypeUtil.toTrinoType(columType.get(), columnValue)
+                            .orElseThrow(() -> new TrinoException(NOT_SUPPORTED, "Google sheets column type " + columType.get() + " of column " + finalColumnValue + " is not supported"));
+                    columns.add(new SheetsColumn(columnValue, trinoColumType));
+                }
+                else {
+                    columns.add(new SheetsColumn(columnValue, VarcharType.VARCHAR));
+                }
             }
             List<List<String>> dataValues = values.subList(1, values.size()); // removing header info
             return Optional.of(new SheetsTable(tableName, columns.build(), dataValues));
@@ -159,8 +173,7 @@ public class SheetsClient
     public List<List<Object>> readAllValues(String tableName)
     {
         try {
-            String sheetExpression = tableSheetMappingCache.getUnchecked(tableName)
-                    .orElseThrow(() -> new TrinoException(SHEETS_UNKNOWN_TABLE_ERROR, "Sheet expression not found for table " + tableName));
+            String sheetExpression = getCachedSheetExpressionForTable(tableName);
             return sheetDataCache.getUnchecked(sheetExpression);
         }
         catch (UncheckedExecutionException e) {
@@ -185,6 +198,12 @@ public class SheetsClient
         return tableSheetMap.get(tableName);
     }
 
+    public String getCachedSheetExpressionForTable(String tableName)
+    {
+        return tableSheetMappingCache.getUnchecked(tableName)
+                .orElseThrow(() -> new TrinoException(SHEETS_UNKNOWN_TABLE_ERROR, "Sheet expression not found for table " + tableName));
+    }
+
     private Map<String, Optional<String>> getAllTableSheetExpressionMapping()
     {
         ImmutableMap.Builder<String, Optional<String>> tableSheetMap = ImmutableMap.builder();
@@ -195,6 +214,16 @@ public class SheetsClient
                 String tableId = String.valueOf(data.get(i).get(0));
                 String sheetId = String.valueOf(data.get(i).get(1));
                 tableSheetMap.put(tableId.toLowerCase(Locale.ENGLISH), Optional.of(sheetId));
+
+                if (data.get(i).size() >= 5) {
+                    String[] tableColumnTypes = String.valueOf(data.get(i).get(4)).split(DELIMITER_COMMA);
+                    for (String tableColumnType : tableColumnTypes) {
+                        String[] split = tableColumnType.split(DELIMITER_EQUALS);
+                        String columnName = split[0];
+                        String columnType = split[1];
+                        tableSheetMappingCache.put(tableId + COLUMN_TYPE_CACHE_KEY + columnName, Optional.of(columnType));
+                    }
+                }
             }
         }
         return tableSheetMap.buildOrThrow();
@@ -232,16 +261,10 @@ public class SheetsClient
 
     private List<List<Object>> readAllValuesFromSheetExpression(String sheetExpression)
     {
+        SheetsSheetIdAndRange sheetIdAndRange = new SheetsSheetIdAndRange(sheetExpression);
         try {
-            // by default loading up to 10k rows from the first tab of the sheet
-            String defaultRange = "$1:$10000";
-            String[] tableOptions = sheetExpression.split("#");
-            String sheetId = tableOptions[0];
-            if (tableOptions.length > 1) {
-                defaultRange = tableOptions[1];
-            }
-            log.debug("Accessing sheet id [%s] with range [%s]", sheetId, defaultRange);
-            return sheetsService.spreadsheets().values().get(sheetId, defaultRange).execute().getValues();
+            log.debug("Accessing sheet id [%s] with range [%s]", sheetIdAndRange.getSheetId(), sheetIdAndRange.getRange());
+            return sheetsService.spreadsheets().values().get(sheetIdAndRange.getSheetId(), sheetIdAndRange.getRange()).execute().getValues();
         }
         catch (IOException e) {
             throw new TrinoException(SHEETS_UNKNOWN_TABLE_ERROR, "Failed reading data from sheet: " + sheetExpression, e);

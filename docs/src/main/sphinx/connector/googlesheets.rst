@@ -66,15 +66,32 @@ Metadata sheet
 --------------
 
 The metadata sheet is used to map table names to sheet IDs.
-Create a new metadata sheet. The first row must be a header row
-containing the following columns in this order:
+The first row must be a header row containing the following columns in this order (the actual header value does not matter):
 
-* Table Name
-* Sheet ID
-* Owner
-* Notes
+.. list-table:: Metadata sheet columns
+   :widths: 25 45 30
+   :header-rows: 1
 
-See this `example sheet <https://docs.google.com/spreadsheets/d/1Es4HhWALUQjoa-bQh4a8B5HROz7dpGMfq_HbfoaW5LM>`_
+   * - Column
+     - Description
+     - Default
+   * - ``Table Name``
+     - Name of the table as it will show up in Trino
+     - no default - mandatory
+   * - ``Sheet ID``
+     - Sheet ID of the Google sheet. See `Sheet ID`_
+     - no default - mandatory
+   * - ``Owner``
+     - Documentation purpose only
+     - empty string
+   * - ``Notes``
+     - Documentation purpose only
+     - empty string
+   * - ``Column types``
+     - Specify types of the columns. See `Column types`_
+     - no type mapping - all columns will be ``VARCHAR``
+
+See this `example sheet <https://docs.google.com/spreadsheets/d/1eKgxd877iah7rFvtcphqSU1z5eA3eYKHKsYkDmErbwo>`_
 as a reference.
 
 The metadata sheet must be shared with the service account user,
@@ -83,10 +100,32 @@ button to share the sheet with the email address of the service account.
 
 Set the ``gsheets.metadata-sheet-id`` configuration property to the ID of this sheet.
 
+Sheet ID
+^^^^^^^^
+Sheet ID of the Google sheet.
+You can extract this from the URL when editing a sheet in a browser.
+Given the URL https://docs.google.com/spreadsheets/d/1eKgxd877iah7rFvtcphqSU1z5eA3eYKHKsYkDmErbwo/edit#gid=0, the sheet id is ``1eKgxd877iah7rFvtcphqSU1z5eA3eYKHKsYkDmErbwo``.
+
+As a default, this connector will fetch 10,000 rows from the first tab in the sheet.
+You need to prepend the tab name after the sheet ID separated with ``#`` in one of the following cases:
+
+* Read more than 10,000 rows
+* Read from a different tab withing the sheet
+
+This could for example look like ``1Es4HhWALUQjoa-bQh4a8B5HROz7dpGMfq_HbfoaW5LM#Customer Orders``.
+
+Column types
+^^^^^^^^^^^^
+Specify types of the columns.
+The format is ``mycol1=varchar,mycol2=bigint,mycol3=bigint``.
+The columns names need to be called the same way as they show up in the Trino table, which is lowercase.
+If no type is specified for a column or no column types are specified at all, ``varchar`` will be used.
+The supported column types are documented in `Type mapping`_.
+
 Querying sheets
 ---------------
 
-The service account user must have access to the sheet in order for Trino
+The service account user must have access to the sheet containing the data in order for Trino
 to query it. Click the *Share* button to share the sheet with the email
 address of the service account.
 
@@ -111,20 +150,26 @@ Type mapping
 Because Trino and Google Sheets each support types that the other does not, this
 connector :ref:`modifies some types <type-mapping-overview>` when reading data.
 
+The section `Column types`_ describes how to specify the types for table columns in the metadata table.
+
 Google Sheets type to Trino type mapping
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The connector maps Google Sheets types to the corresponding Trino types
-following this table:
+The connector maps Google Sheets types to the corresponding Trino types using the provided column type.
+The possible types are listed in the following table.
 
-.. list-table:: Google Sheets type to Trino type mapping
-  :widths: 30, 20
+.. list-table:: Supported sheet column types
+  :widths: 40, 20
   :header-rows: 1
 
-  * - Google Sheets type
+  * - Sheet column type
     - Trino type
-  * - ``TEXT``
+  * - <not specified>
     - ``VARCHAR``
+  * - ``varchar``
+    - ``VARCHAR``
+  * - ``bigint``
+    - ``BIGINT``
 
 No other types are supported.
 
