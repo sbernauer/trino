@@ -6,7 +6,7 @@ Google Sheets connector
 
   <img src="../_static/img/google-sheets.png" class="connector-logo">
 
-The Google Sheets connector allows reading `Google Sheets <https://www.google.com/sheets/about/>`_ spreadsheets as tables in Trino.
+The Google Sheets connector allows reading and writing `Google Sheets <https://www.google.com/sheets/about/>`_ spreadsheets as tables in Trino.
 
 Configuration
 -------------
@@ -135,6 +135,19 @@ to a specific tab in the sheet, add the tab name after the sheet ID, separated
 with ``#``. If tab name is not provided, connector loads only 10,000 rows by default from
 the first tab in the sheet.
 
+Writing to sheets
+-----------------
+The same way sheets can be queried, they can also be written by appending data to existing sheets.
+In this case the service account user must also have **write** access to the sheet.
+
+After data is written to a table, the table contents are removed from the cache described in `API usage limits`_.
+If the table is accessed imitatively after the write, querying the Google Sheets API may not reflect the change yet.
+In that case the old version of the table will be read and cached for the configured amount of time.
+So it might take some time for the written changes to propagate properly.
+
+Please keep in mind that the Google Sheets API has `usage limits <https://developers.google.com/sheets/api/limits>`_, which limit the speed of inserting data.
+You might run into timeouts (which you can increase using the configuration properties) or ``503: The service is currently unavailable`` errors.
+
 API usage limits
 ----------------
 
@@ -173,11 +186,13 @@ The possible types are listed in the following table.
 
 No other types are supported.
 
+When writing data the correct types of the columns will be checked and all the rows will be appended as text to the sheet.
+
 .. _google-sheets-sql-support:
 
 SQL support
 -----------
+In addition to the :ref:`globally available <sql-globally-available>` and :ref:`read operation <sql-read-operations>` statements,
+the connector supports the following features:
 
-The connector provides :ref:`globally available <sql-globally-available>` and
-:ref:`read operation <sql-read-operations>` statements to access data and
-metadata in Google Sheets.
+* :doc:`/sql/insert`
