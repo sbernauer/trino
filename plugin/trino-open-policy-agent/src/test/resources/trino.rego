@@ -70,6 +70,20 @@ allow {
     has_schema_permission(input.action.resource.table.catalogName, input.action.resource.table.schemaName, "full")
 }
 
+allow {
+    input.action.operation in [
+        "CreateView",
+        "DropView",
+        "RenameView",
+        "CreateMaterializedView",
+        "DropMaterializedView",
+        "RenameMaterializedView",
+        "SetMaterializedViewProperties",
+    ]
+
+    has_schema_permission(input.action.resource.view.catalogName, input.action.resource.view.schemaName, "full")
+}
+
 extended[i] {
     input.action.operation == "FilterCatalogs"
     some i

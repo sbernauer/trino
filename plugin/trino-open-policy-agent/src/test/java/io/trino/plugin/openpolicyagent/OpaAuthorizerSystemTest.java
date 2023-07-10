@@ -408,6 +408,8 @@ public class OpaAuthorizerSystemTest
             trinoDataAnalyst1Client.execute("DROP TABLE lakehouse.customer_2.nation");
             trinoDataAnalyst1Client.execute("CREATE TABLE lakehouse.customer_2.nation AS SELECT * FROM tpch.tiny.nation");
             assertAccessDenied(trinoDataAnalyst1Client, "CREATE TABLE tpch.tiny.foo AS SELECT * FROM tpch.tiny.nation");
+
+            trinoDataAnalyst1Client.execute("CREATE VIEW lakehouse.customer_1.nation_view AS SELECT * FROM lakehouse.customer_1.nation");
         }
     }
 
