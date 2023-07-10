@@ -370,12 +370,19 @@ public class OpaAuthorizerSystemTest
             trinoDataAnalyst1Client.execute("CREATE SCHEMA lakehouse.customer_1");
             trinoDataAnalyst1Client.execute("CREATE SCHEMA lakehouse.customer_2");
 
-            assertCatalogList(trinoAdminClient, "catalog_without_schemas_acls", "lakehouse", "system", "tpch");
-            assertCatalogList(trinoSupersetClient);
-            assertCatalogList(trinoDataAnalyst1Client, "catalog_without_schemas_acls", "lakehouse", "tpch");
-            assertCatalogList(trinoDataAnalyst2Client, "catalog_without_schemas_acls", "lakehouse", "tpch");
-            assertCatalogList(trinoCustomer1User1Client, "lakehouse");
-            assertCatalogList(trinoCustomer2User1Client, "lakehouse");
+            assertQueryReturns(trinoAdminClient, "SHOW CATALOGS", "catalog_without_schemas_acls", "lakehouse", "system", "tpch");
+            assertQueryReturns(trinoSupersetClient, "SHOW CATALOGS", "system");
+            assertQueryReturns(trinoDataAnalyst1Client, "SHOW CATALOGS", "catalog_without_schemas_acls", "lakehouse", "system", "tpch");
+            assertQueryReturns(trinoDataAnalyst2Client, "SHOW CATALOGS", "catalog_without_schemas_acls", "lakehouse", "system", "tpch");
+            assertQueryReturns(trinoCustomer1User1Client, "SHOW CATALOGS", "lakehouse", "system");
+            assertQueryReturns(trinoCustomer2User1Client, "SHOW CATALOGS", "lakehouse", "system");
+
+            assertQueryReturns(trinoAdminClient, "SELECT * FROM system.jdbc.catalogs", "catalog_without_schemas_acls", "lakehouse", "system", "tpch");
+            assertQueryReturns(trinoSupersetClient, "SELECT * FROM system.jdbc.catalogs", "system");
+            assertQueryReturns(trinoDataAnalyst1Client, "SELECT * FROM system.jdbc.catalogs", "catalog_without_schemas_acls", "lakehouse", "system", "tpch");
+            assertQueryReturns(trinoDataAnalyst2Client, "SELECT * FROM system.jdbc.catalogs", "catalog_without_schemas_acls", "lakehouse", "system", "tpch");
+            assertQueryReturns(trinoCustomer1User1Client, "SELECT * FROM system.jdbc.catalogs", "lakehouse", "system");
+            assertQueryReturns(trinoCustomer2User1Client, "SELECT * FROM system.jdbc.catalogs", "lakehouse", "system");
 
             assertSchemaList(trinoAdminClient, "catalog_without_schemas_acls", "default", "information_schema");
             assertSchemaList(trinoAdminClient, "lakehouse", "customer_1", "customer_2", "default", "information_schema");
@@ -384,43 +391,78 @@ public class OpaAuthorizerSystemTest
 
             assertAccessDenied(trinoSupersetClient, "SHOW SCHEMAS IN catalog_without_schemas_acls");
             assertAccessDenied(trinoSupersetClient, "SHOW SCHEMAS IN lakehouse");
-            assertAccessDenied(trinoSupersetClient, "SHOW SCHEMAS IN system");
+            assertSchemaList(trinoSupersetClient, "system", "information_schema", "jdbc", "metadata", "runtime");
             assertAccessDenied(trinoSupersetClient, "SHOW SCHEMAS IN tpch");
 
             assertSchemaList(trinoDataAnalyst1Client, "catalog_without_schemas_acls", "default", "information_schema");
             assertSchemaList(trinoDataAnalyst1Client, "lakehouse", "customer_1", "customer_2", "default", "information_schema");
-            assertAccessDenied(trinoDataAnalyst1Client, "SHOW SCHEMAS IN system");
+            assertSchemaList(trinoDataAnalyst1Client, "system", "information_schema", "jdbc", "metadata", "runtime");
             assertSchemaList(trinoDataAnalyst1Client, "tpch", "information_schema", "sf1", "sf100", "sf1000", "sf10000", "sf100000", "sf300", "sf3000", "sf30000", "tiny");
 
             assertAccessDenied(trinoCustomer1User1Client, "SHOW SCHEMAS IN catalog_without_schemas_acls");
             assertSchemaList(trinoCustomer1User1Client, "lakehouse", "customer_1");
-            assertAccessDenied(trinoCustomer1User1Client, "SHOW SCHEMAS IN system");
+            assertSchemaList(trinoCustomer1User1Client, "system", "information_schema", "jdbc", "metadata", "runtime");
             assertAccessDenied(trinoCustomer1User1Client, "SHOW SCHEMAS IN tpch");
 
             assertAccessDenied(trinoCustomer2User1Client, "SHOW SCHEMAS IN catalog_without_schemas_acls");
-            assertSchemaList(trinoCustomer2User1Client, "lakehouse", "customer_2");
-            assertAccessDenied(trinoCustomer2User1Client, "SHOW SCHEMAS IN system");
+            assertSchemaList(trinoCustomer2User1Client, "lakehouse", "customer_1", "customer_2");
+            assertSchemaList(trinoCustomer2User1Client, "system", "information_schema", "jdbc", "metadata", "runtime");
             assertAccessDenied(trinoCustomer2User1Client, "SHOW SCHEMAS IN tpch");
 
             // Create tables with data for customers
             trinoDataAnalyst1Client.execute("CREATE TABLE lakehouse.customer_1.nation AS SELECT * FROM tpch.tiny.nation");
             trinoDataAnalyst1Client.execute("CREATE TABLE IF NOT EXISTS lakehouse.customer_2.nation AS SELECT * FROM tpch.tiny.nation");
             trinoDataAnalyst1Client.execute("DROP TABLE lakehouse.customer_2.nation");
-            trinoDataAnalyst1Client.execute("CREATE TABLE lakehouse.customer_2.nation AS SELECT * FROM tpch.tiny.nation");
+            trinoDataAnalyst1Client.execute("CREATE TABLE lakehouse.customer_2.tmp AS SELECT * FROM tpch.tiny.nation");
+            trinoDataAnalyst1Client.execute("ALTER TABLE lakehouse.customer_2.tmp RENAME TO lakehouse.customer_2.nation");
             assertAccessDenied(trinoDataAnalyst1Client, "CREATE TABLE tpch.tiny.foo AS SELECT * FROM tpch.tiny.nation");
+            trinoDataAnalyst1Client.execute("CREATE TABLE lakehouse.customer_1.public_export AS SELECT * FROM tpch.tiny.nation");
 
+            // Also create views
             trinoDataAnalyst1Client.execute("CREATE VIEW lakehouse.customer_1.nation_view AS SELECT * FROM lakehouse.customer_1.nation");
+            trinoDataAnalyst1Client.execute("CREATE VIEW lakehouse.customer_1.nation_view_security_invoker SECURITY INVOKER AS SELECT * FROM lakehouse.customer_1.nation");
+            trinoDataAnalyst1Client.execute("CREATE OR REPLACE VIEW lakehouse.customer_1.tmp AS SELECT * FROM lakehouse.customer_1.nation");
+            trinoDataAnalyst1Client.execute("DROP VIEW lakehouse.customer_1.tmp");
+            // Materialized views not supported by Memory connector, something like Iceberg connector would be needed
+
+            // Try to access tables/views again
+            trinoDataAnalyst1Client.execute("SELECT COUNT(*) FROM lakehouse.customer_1.nation");
+            trinoDataAnalyst1Client.execute("SELECT COUNT(*) FROM lakehouse.customer_1.nation_view");
+            trinoDataAnalyst1Client.execute("SELECT COUNT(*) FROM lakehouse.customer_1.nation_view_security_invoker");
+            trinoCustomer1User1Client.execute("SELECT COUNT(*) FROM lakehouse.customer_1.nation");
+            trinoCustomer1User1Client.execute("SELECT COUNT(*) FROM lakehouse.customer_1.nation_view");
+            trinoCustomer1User1Client.execute("SELECT COUNT(*) FROM lakehouse.customer_1.nation_view_security_invoker");
+            assertAccessDenied(trinoCustomer2User1Client, "SELECT COUNT(*) FROM lakehouse.customer_1.nation");
+            // Besides the view having SECURITY DEFINER (default), customer-2 can not access the view itself
+            assertAccessDenied(trinoCustomer2User1Client, "SELECT COUNT(*) FROM lakehouse.customer_1.nation_view");
+            assertAccessDenied(trinoCustomer2User1Client, "SELECT COUNT(*) FROM lakehouse.customer_1.nation_view_security_invoker");
+
+            trinoDataAnalyst1Client.execute("SELECT * FROM lakehouse.customer_1.nation limit 1");
+            trinoDataAnalyst1Client.execute("SELECT * FROM lakehouse.customer_1.nation_view limit 1");
+            trinoDataAnalyst1Client.execute("SELECT * FROM lakehouse.customer_1.nation_view_security_invoker limit 1");
+            trinoCustomer1User1Client.execute("SELECT * FROM lakehouse.customer_1.nation limit 1");
+            trinoCustomer1User1Client.execute("SELECT * FROM lakehouse.customer_1.nation_view limit 1");
+            trinoCustomer1User1Client.execute("SELECT * FROM lakehouse.customer_1.nation_view_security_invoker limit 1");
+            assertAccessDenied(trinoCustomer2User1Client, "SELECT * FROM lakehouse.customer_1.nation limit 1");
+            assertAccessDenied(trinoCustomer2User1Client, "SELECT * FROM lakehouse.customer_1.nation_view limit 1");
+            assertAccessDenied(trinoCustomer2User1Client, "SELECT * FROM lakehouse.customer_1.nation_view_security_invoker limit 1");
+
+            // The table lakehouse.customer_1.public_export is public and can be access by anyone
+            trinoAdminClient.execute("SELECT * FROM lakehouse.customer_1.public_export limit 1");
+            trinoDataAnalyst1Client.execute("SELECT * FROM lakehouse.customer_1.public_export limit 1");
+            trinoCustomer1User1Client.execute("SELECT * FROM lakehouse.customer_1.public_export limit 1");
+            trinoCustomer2User1Client.execute("SELECT * FROM lakehouse.customer_1.public_export limit 1");
         }
     }
 
-    private void assertCatalogList(TestingTrinoClient trinoClient, String... expectedCatalogs)
+    private void assertQueryReturns(TestingTrinoClient trinoClient, String query, String... expected)
     {
-        List<String> catalogs = new ArrayList<>();
-        MaterializedResult result = trinoClient.execute("SHOW CATALOGS").getResult();
+        List<String> rows = new ArrayList<>();
+        MaterializedResult result = trinoClient.execute(query).getResult();
         for (MaterializedRow row : result) {
-            catalogs.add(row.getField(0).toString());
+            rows.add(row.getField(0).toString());
         }
-        assertEquals(new ArrayList<>(Arrays.asList(expectedCatalogs)), catalogs);
+        assertEquals(new ArrayList<>(Arrays.asList(expected)), rows);
     }
 
     private void assertSchemaList(TestingTrinoClient trinoClient, String catalog, String... expectedSchemas)

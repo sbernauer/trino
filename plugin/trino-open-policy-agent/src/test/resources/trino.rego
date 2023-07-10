@@ -9,12 +9,6 @@ default allow = false
 group_member(group) if input.context.identity.user in data.groups[group]
 user_is_group_member(user, group) if user in data.groups[group]
 
-# TODO REMOVE ###########################################
-allow {
-    input.action.operation in ["SelectFromColumns"]
-}
-# TODO REMOVE ###########################################
-
 # Admins can do anything
 allow {
     group_member("admin")
@@ -27,7 +21,7 @@ extended[i] {
 
 # Every can execute queries
 allow {
-    input.action.operation == "ExecuteQuery"
+    input.action.operation in ["ExecuteQuery", "ExecuteFunction"]
 }
 
 allow {
@@ -37,44 +31,50 @@ allow {
         "ShowSchemas",
     ]
 
-    has_catalog_permission(input.action.resource.catalog.name, "ro")
-}
-
-allow {
-    input.action.operation in [
-        "AccessCatalog",
-        "SetCatalogSessionProperty",
-        "ShowSchemas",
-    ]
-
-    has_permission_for_any_schema_in_catalog(input.action.resource.catalog.name, "ro")
+    has_permission_for_any_table_in_catalog(input.action.resource.catalog.name, "ro")
 }
 
 allow {
     input.action.operation in [
         "CreateSchema",
         "DropSchema",
+    ]
+
+    has_schema_permission(input.action.resource.schema.catalogName, input.action.resource.schema.schemaName, "full")
+}
+
+allow {
+    input.action.operation in [
         "RenameSchema",
     ]
 
-    has_catalog_permission(input.action.resource.schema.catalogName, "full")
+    has_schema_permission(input.action.resource.schema.catalogName, input.action.resource.schema.schemaName, "full")
+    has_schema_permission(input.action.targetResource.schema.catalogName, input.action.targetResource.schema.schemaName, "full")
 }
 
 allow {
     input.action.operation in [
         "CreateTable",
         "DropTable",
+        "CreateViewWithSelectFromColumns",
+    ]
+
+    has_table_permission(input.action.resource.table.catalogName, input.action.resource.table.schemaName, input.action.resource.table.tableName, "full")
+}
+
+allow {
+    input.action.operation in [
         "RenameTable",
     ]
 
-    has_schema_permission(input.action.resource.table.catalogName, input.action.resource.table.schemaName, "full")
+    has_table_permission(input.action.resource.table.catalogName, input.action.resource.table.schemaName, input.action.resource.table.tableName, "full")
+    has_table_permission(input.action.targetResource.table.catalogName, input.action.targetResource.table.schemaName, input.action.targetResource.table.tableName, "full")
 }
 
 allow {
     input.action.operation in [
         "CreateView",
         "DropView",
-        "RenameView",
         "CreateMaterializedView",
         "DropMaterializedView",
         "RenameMaterializedView",
@@ -84,31 +84,40 @@ allow {
     has_schema_permission(input.action.resource.view.catalogName, input.action.resource.view.schemaName, "full")
 }
 
-extended[i] {
-    input.action.operation == "FilterCatalogs"
-    some i
-    has_catalog_permission(input.action.filterResources[i].catalog.name, "ro")
+allow {
+    input.action.operation in [
+        "RenameView",
+    ]
+
+    has_schema_permission(input.action.resource.view.catalogName, input.action.resource.view.schemaName, "full")
+    has_schema_permission(input.action.targetResource.view.catalogName, input.action.targetResource.view.schemaName, "full")
+}
+
+allow {
+    input.action.operation in [
+        "SelectFromColumns",
+    ]
+
+    has_table_permission(input.action.resource.table.catalogName, input.action.resource.table.schemaName, input.action.resource.table.tableName, "ro")
 }
 
 extended[i] {
     input.action.operation == "FilterCatalogs"
     some i
-    has_permission_for_any_schema_in_catalog(input.action.filterResources[i].catalog.name, "ro")
+    has_permission_for_any_table_in_catalog(input.action.filterResources[i].catalog.name, "ro")
 }
 
 extended[i] {
     input.action.operation == "FilterSchemas"
     some i
-    has_schema_permission(input.action.filterResources[i].schema.catalogName, input.action.filterResources[i].schema.schemaName, "ro")
+    has_permission_for_any_table_in_schema(input.action.filterResources[i].schema.catalogName, input.action.filterResources[i].schema.schemaName, "ro")
 }
 
-
-
-
-
-
-
-
+extended[i] {
+    input.action.operation == "FilterTables"
+    some i
+    has_table_permission(input.action.filterResources[i].schema.catalogName, input.action.filterResources[i].schema.schemaName, input.action.filterResources[i].schema.tableName, "ro")
+}
 
 grant_hierarchy := {
     "full": ["full", "rw","ro"],
@@ -126,6 +135,12 @@ has_catalog_permission(catalog, permission) {
     some catalog_id
     data.catalog_acls[catalog_id].catalog = catalog
     group in data.catalog_acls[catalog_id][grant]
+}
+
+# Needed internally, e.g. for trino clients or JDBC clients
+has_catalog_permission(catalog, permission) {
+    catalog = "system"
+    permission = "ro"
 }
 
 has_schema_permission(catalog, schema, permission) {
@@ -155,6 +170,68 @@ has_permission_for_any_schema_in_catalog(catalog, permission) {
 
 # We might need this explicitly, as their might be no schema within this catalog in data.schema_acls
 has_permission_for_any_schema_in_catalog(catalog, permission) {
+    has_catalog_permission(catalog, permission)
+}
+
+has_table_permission(catalog, schema, table, permission) {
+    some group
+    input.context.identity.user in data.groups[group]
+
+    some grant
+    permission in grant_hierarchy[grant]
+
+    some table_id
+    data.table_acls[table_id].catalog = catalog
+    data.table_acls[table_id].schema = schema
+    data.table_acls[table_id].table = table
+    group in data.table_acls[table_id][grant]
+}
+
+# Permissions granted on schema level are inherited for tables as well
+has_table_permission(catalog, schema, table, permission) {
+    has_schema_permission(catalog, schema, permission)
+}
+
+allow {
+    input.action.operation in ["SelectFromColumns"]
+    input.action.resource.table.schemaName = "information_schema"
+    input.action.resource.table.tableName = "schemata"
+    has_permission_for_any_table_in_catalog(input.action.resource.table.catalogName, "ro")
+}
+
+has_permission_for_any_table_in_schema(catalog, schema, permission) {
+    some table
+    some table_id
+    data.table_acls[table_id].schema = schema
+    data.table_acls[table_id].table = table
+    has_table_permission(catalog, schema, table, permission)
+}
+
+# We might need this explicitly, as their might be no table within this schema in data.table_acls
+has_permission_for_any_table_in_schema(catalog, schema, permission) {
+    has_schema_permission(catalog, schema, permission)
+}
+
+has_permission_for_any_table_in_catalog(catalog, permission) {
+    some schema
+    some schema_id
+    some table
+    some table_id
+    data.schema_acls[schema_id].schema = schema
+    data.table_acls[table_id].schema = schema
+    data.table_acls[table_id].table = table
+    has_schema_permission(catalog, schema, permission)
+    has_table_permission(catalog, schema, table, permission)
+}
+
+has_permission_for_any_table_in_catalog(catalog, permission) {
+    some schema
+    some schema_id
+    data.schema_acls[schema_id].schema = schema
+    has_schema_permission(catalog, schema, permission)
+}
+
+has_permission_for_any_table_in_catalog(catalog, permission) {
     has_catalog_permission(catalog, permission)
 }
 
@@ -199,7 +276,7 @@ data := {
             "catalog": "lakehouse",
             "schema": "customer_1",
             "table": "public_export",
-            "ro": ["anyone"],
+            "ro": ["customer-2"],
         },
     ]
 }
