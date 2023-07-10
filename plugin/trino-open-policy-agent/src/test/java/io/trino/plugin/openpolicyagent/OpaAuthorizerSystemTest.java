@@ -13,14 +13,18 @@
  */
 package io.trino.plugin.openpolicyagent;
 
+import com.google.common.io.Resources;
 import io.trino.Session;
 import io.trino.execution.QueryIdGenerator;
 import io.trino.metadata.SessionPropertyManager;
+import io.trino.plugin.memory.MemoryPlugin;
+import io.trino.plugin.tpch.TpchPlugin;
 import io.trino.server.testing.TestingTrinoServer;
 import io.trino.spi.security.Identity;
 import io.trino.testing.MaterializedResult;
 import io.trino.testing.MaterializedRow;
 import io.trino.testing.TestingTrinoClient;
+import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -36,11 +40,13 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -95,6 +101,30 @@ public class OpaAuthorizerSystemTest
         }
         throw new SocketTimeoutException("Timed out waiting for addr " + addr + " to be available ("
                 + attempts + " attempts made at " + timeoutMs + "ms each)");
+    }
+
+    private static TestingTrinoServer getTrinoServer(boolean batched) {
+        if (batched) {
+            return TestingTrinoServer.builder()
+                    .setSystemAccessControls(Collections.singletonList(new OpaBatchAuthorizer(new OpaConfig()
+                            .setOpaUri(opaServerUri.resolve("v1/data/trino/allow"))
+                            .setOpaBatchUri(opaServerUri.resolve("v1/data/trino/extended")))))
+                    .build();
+        } else {
+            return TestingTrinoServer.builder()
+                    .setSystemAccessControls(Collections.singletonList(new OpaAuthorizer(new OpaConfig()
+                            .setOpaUri(opaServerUri.resolve("v1/data/trino/allow")))))
+                    .build();
+        }
+    }
+
+    private static TestingTrinoClient getTrinoClient(String userName) {
+        QueryIdGenerator idGen = new QueryIdGenerator();
+        Identity identity = Identity.forUser(userName).build();
+        SessionPropertyManager sessionPropertyManager = new SessionPropertyManager();
+        Session session = Session.builder(sessionPropertyManager)
+                .setQueryId(idGen.createNextQueryId()).setIdentity(identity).build();
+        return new TestingTrinoClient(trinoServer, session);
     }
 
     @BeforeAll
@@ -163,15 +193,8 @@ public class OpaAuthorizerSystemTest
         @BeforeAll
         public static void setupTrino()
         {
-            QueryIdGenerator idGen = new QueryIdGenerator();
-            Identity identity = Identity.forUser("bob").build();
-            SessionPropertyManager sessionPropertyManager = new SessionPropertyManager();
-            Session session = Session.builder(sessionPropertyManager)
-                    .setQueryId(idGen.createNextQueryId()).setIdentity(identity).build();
-            trinoServer = TestingTrinoServer.builder()
-                    .setSystemAccessControls(Collections.singletonList(new OpaAuthorizer(new OpaConfig().setOpaUri(opaServerUri.resolve("v1/data/trino/allow")))))
-                    .build();
-            trinoClient = new TestingTrinoClient(trinoServer, session);
+            trinoServer = getTrinoServer(false);
+            trinoClient = getTrinoClient("bob");
         }
 
         @Test
@@ -236,15 +259,8 @@ public class OpaAuthorizerSystemTest
         @BeforeAll
         public static void setupTrino()
         {
-            QueryIdGenerator idGen = new QueryIdGenerator();
-            Identity identity = Identity.forUser("bob").build();
-            SessionPropertyManager sessionPropertyManager = new SessionPropertyManager();
-            Session session = Session.builder(sessionPropertyManager)
-                    .setQueryId(idGen.createNextQueryId()).setIdentity(identity).build();
-            trinoServer = TestingTrinoServer.builder()
-                    .setSystemAccessControls(Collections.singletonList(new OpaBatchAuthorizer(new OpaConfig().setOpaUri(opaServerUri.resolve("v1/data/trino/allow")).setOpaBatchUri(opaServerUri.resolve("v1/data/trino/extended")))))
-                    .build();
-            trinoClient = new TestingTrinoClient(trinoServer, session);
+            trinoServer = getTrinoServer(true);
+            trinoClient = getTrinoClient("bob");
         }
 
         @Test
@@ -317,5 +333,95 @@ public class OpaAuthorizerSystemTest
                     .forEachRemaining((i) -> version.add(i.getField(0).toString()));
             assertFalse(version.isEmpty());
         }
+    }
+
+    @Nested
+    @DisplayName("Authorizer Tests testing complex rego rules")
+    class ComplexAuthorizerTests {
+        @BeforeAll
+        public static void setupTrino()
+        {
+            trinoServer = getTrinoServer(true);
+            trinoServer.installPlugin(new MemoryPlugin());
+            trinoServer.installPlugin(new TpchPlugin());
+            trinoServer.createCatalog("tpch", "tpch");
+            trinoServer.createCatalog("lakehouse", "memory");
+            trinoServer.createCatalog("catalog_without_schemas_acls", "memory");
+        }
+
+        @Test
+        public void testComplex()
+                throws IOException, InterruptedException {
+            TestingTrinoClient trinoAdminClient = getTrinoClient("admin");
+            TestingTrinoClient trinoSupersetClient = getTrinoClient("superset");
+            TestingTrinoClient trinoDataAnalyst1Client = getTrinoClient("data-analyst-1");
+            TestingTrinoClient trinoDataAnalyst2Client = getTrinoClient("data-analyst-2");
+            TestingTrinoClient trinoCustomer1User1Client = getTrinoClient("customer-1-user-1");
+            TestingTrinoClient trinoCustomer2User1Client = getTrinoClient("customer-2-user-1");
+
+            String policy = Resources.toString(Resources.getResource("trino.rego"), UTF_8);
+            submitPolicy(policy);
+
+            // Setup schema structure for customers
+            trinoAdminClient.execute("CREATE SCHEMA lakehouse.customer_1");
+            trinoAdminClient.execute("CREATE SCHEMA lakehouse.customer_2");
+
+            assertCatalogList(trinoAdminClient, "catalog_without_schemas_acls", "lakehouse", "system", "tpch");
+            assertCatalogList(trinoSupersetClient);
+            assertCatalogList(trinoDataAnalyst1Client, "catalog_without_schemas_acls", "lakehouse");
+            assertCatalogList(trinoDataAnalyst2Client, "catalog_without_schemas_acls", "lakehouse");
+            assertCatalogList(trinoCustomer1User1Client, "lakehouse");
+            assertCatalogList(trinoCustomer2User1Client, "lakehouse");
+
+            assertSchemaList(trinoAdminClient, "catalog_without_schemas_acls", "default", "information_schema");
+            assertSchemaList(trinoAdminClient, "lakehouse", "customer_1", "customer_2", "default", "information_schema");
+            assertSchemaList(trinoAdminClient, "system", "information_schema", "jdbc", "metadata", "runtime");
+            assertSchemaList(trinoAdminClient, "tpch", "information_schema", "sf1", "sf100", "sf1000", "sf10000", "sf100000", "sf300", "sf3000", "sf30000", "tiny");
+
+            assertAccessDenied(trinoSupersetClient, "SHOW SCHEMAS IN catalog_without_schemas_acls");
+            assertAccessDenied(trinoSupersetClient, "SHOW SCHEMAS IN lakehouse");
+            assertAccessDenied(trinoSupersetClient, "SHOW SCHEMAS IN system");
+            assertAccessDenied(trinoSupersetClient, "SHOW SCHEMAS IN tpch");
+
+            assertSchemaList(trinoDataAnalyst1Client, "catalog_without_schemas_acls", "default", "information_schema");
+            assertSchemaList(trinoDataAnalyst1Client, "lakehouse", "customer_1", "customer_2", "default", "information_schema");
+            assertAccessDenied(trinoDataAnalyst1Client, "SHOW SCHEMAS IN system");
+            assertAccessDenied(trinoDataAnalyst1Client, "SHOW SCHEMAS IN tpch");
+
+            assertAccessDenied(trinoCustomer1User1Client, "SHOW SCHEMAS IN catalog_without_schemas_acls");
+            assertSchemaList(trinoCustomer1User1Client, "lakehouse", "customer_1");
+            assertAccessDenied(trinoCustomer1User1Client, "SHOW SCHEMAS IN system");
+            assertAccessDenied(trinoCustomer1User1Client, "SHOW SCHEMAS IN tpch");
+
+            assertAccessDenied(trinoCustomer2User1Client, "SHOW SCHEMAS IN catalog_without_schemas_acls");
+            assertSchemaList(trinoCustomer2User1Client, "lakehouse", "customer_2");
+            assertAccessDenied(trinoCustomer2User1Client, "SHOW SCHEMAS IN system");
+            assertAccessDenied(trinoCustomer2User1Client, "SHOW SCHEMAS IN tpch");
+        }
+    }
+
+    private void assertCatalogList(TestingTrinoClient trinoClient, String... expectedCatalogs) {
+        List<String> catalogs = new ArrayList<>();
+        MaterializedResult result = trinoClient.execute("SHOW CATALOGS").getResult();
+        for (MaterializedRow row : result) {
+            catalogs.add(row.getField(0).toString());
+        }
+        assertEquals(new ArrayList<>(Arrays.asList(expectedCatalogs)), catalogs);
+    }
+
+    private void assertSchemaList(TestingTrinoClient trinoClient, String catalog, String... expectedSchemas) {
+        List<String> schemas = new ArrayList<>();
+        MaterializedResult result = trinoClient.execute("SHOW SCHEMAS IN " + catalog).getResult();
+        for (MaterializedRow row : result) {
+            schemas.add(row.getField(0).toString());
+        }
+        assertEquals(new ArrayList<>(Arrays.asList(expectedSchemas)), schemas);
+    }
+
+    private void assertAccessDenied(TestingTrinoClient trinoClient, @Language("SQL") String query) {
+        RuntimeException error = assertThrows(RuntimeException.class, () -> {
+            trinoClient.execute(query);
+        });
+        assertTrue(error.getMessage().contains("Access Denied"), "Error must mention 'Access Denied': " + error.getMessage());
     }
 }
