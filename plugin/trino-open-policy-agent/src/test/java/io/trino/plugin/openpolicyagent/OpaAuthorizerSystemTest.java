@@ -24,7 +24,6 @@ import io.trino.spi.security.Identity;
 import io.trino.testing.MaterializedResult;
 import io.trino.testing.MaterializedRow;
 import io.trino.testing.TestingTrinoClient;
-import org.intellij.lang.annotations.Language;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
@@ -103,14 +102,16 @@ public class OpaAuthorizerSystemTest
                 + attempts + " attempts made at " + timeoutMs + "ms each)");
     }
 
-    private static TestingTrinoServer getTrinoServer(boolean batched) {
+    private static TestingTrinoServer getTrinoServer(boolean batched)
+    {
         if (batched) {
             return TestingTrinoServer.builder()
                     .setSystemAccessControls(Collections.singletonList(new OpaBatchAuthorizer(new OpaConfig()
                             .setOpaUri(opaServerUri.resolve("v1/data/trino/allow"))
                             .setOpaBatchUri(opaServerUri.resolve("v1/data/trino/extended")))))
                     .build();
-        } else {
+        }
+        else {
             return TestingTrinoServer.builder()
                     .setSystemAccessControls(Collections.singletonList(new OpaAuthorizer(new OpaConfig()
                             .setOpaUri(opaServerUri.resolve("v1/data/trino/allow")))))
@@ -118,7 +119,8 @@ public class OpaAuthorizerSystemTest
         }
     }
 
-    private static TestingTrinoClient getTrinoClient(String userName) {
+    private static TestingTrinoClient getTrinoClient(String userName)
+    {
         QueryIdGenerator idGen = new QueryIdGenerator();
         Identity identity = Identity.forUser(userName).build();
         SessionPropertyManager sessionPropertyManager = new SessionPropertyManager();
@@ -337,7 +339,8 @@ public class OpaAuthorizerSystemTest
 
     @Nested
     @DisplayName("Authorizer Tests testing complex rego rules")
-    class ComplexAuthorizerTests {
+    class ComplexAuthorizerTests
+    {
         @BeforeAll
         public static void setupTrino()
         {
@@ -351,7 +354,8 @@ public class OpaAuthorizerSystemTest
 
         @Test
         public void testComplex()
-                throws IOException, InterruptedException {
+                throws IOException, InterruptedException
+        {
             TestingTrinoClient trinoAdminClient = getTrinoClient("admin");
             TestingTrinoClient trinoSupersetClient = getTrinoClient("superset");
             TestingTrinoClient trinoDataAnalyst1Client = getTrinoClient("data-analyst-1");
@@ -400,7 +404,8 @@ public class OpaAuthorizerSystemTest
         }
     }
 
-    private void assertCatalogList(TestingTrinoClient trinoClient, String... expectedCatalogs) {
+    private void assertCatalogList(TestingTrinoClient trinoClient, String... expectedCatalogs)
+    {
         List<String> catalogs = new ArrayList<>();
         MaterializedResult result = trinoClient.execute("SHOW CATALOGS").getResult();
         for (MaterializedRow row : result) {
@@ -409,7 +414,8 @@ public class OpaAuthorizerSystemTest
         assertEquals(new ArrayList<>(Arrays.asList(expectedCatalogs)), catalogs);
     }
 
-    private void assertSchemaList(TestingTrinoClient trinoClient, String catalog, String... expectedSchemas) {
+    private void assertSchemaList(TestingTrinoClient trinoClient, String catalog, String... expectedSchemas)
+    {
         List<String> schemas = new ArrayList<>();
         MaterializedResult result = trinoClient.execute("SHOW SCHEMAS IN " + catalog).getResult();
         for (MaterializedRow row : result) {
@@ -418,7 +424,8 @@ public class OpaAuthorizerSystemTest
         assertEquals(new ArrayList<>(Arrays.asList(expectedSchemas)), schemas);
     }
 
-    private void assertAccessDenied(TestingTrinoClient trinoClient, @Language("SQL") String query) {
+    private void assertAccessDenied(TestingTrinoClient trinoClient, String query)
+    {
         RuntimeException error = assertThrows(RuntimeException.class, () -> {
             trinoClient.execute(query);
         });
