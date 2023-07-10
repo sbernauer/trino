@@ -50,6 +50,26 @@ allow {
     has_permission_for_any_schema_in_catalog(input.action.resource.catalog.name, "ro")
 }
 
+allow {
+    input.action.operation in [
+        "CreateSchema",
+        "DropSchema",
+        "RenameSchema",
+    ]
+
+    has_catalog_permission(input.action.resource.schema.catalogName, "full")
+}
+
+allow {
+    input.action.operation in [
+        "CreateTable",
+        "DropTable",
+        "RenameTable",
+    ]
+
+    has_schema_permission(input.action.resource.table.catalogName, input.action.resource.table.schemaName, "full")
+}
+
 extended[i] {
     input.action.operation == "FilterCatalogs"
     some i
@@ -142,6 +162,10 @@ data := {
         {
             "catalog": "catalog_without_schemas_acls",
             "full": ["data-analysts"],
+        },
+        {
+            "catalog": "tpch",
+            "ro": ["data-analysts"],
         },
     ],
     "schema_acls" : [

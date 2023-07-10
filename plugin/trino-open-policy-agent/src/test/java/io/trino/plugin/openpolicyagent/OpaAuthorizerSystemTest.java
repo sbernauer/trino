@@ -367,13 +367,13 @@ public class OpaAuthorizerSystemTest
             submitPolicy(policy);
 
             // Setup schema structure for customers
-            trinoAdminClient.execute("CREATE SCHEMA lakehouse.customer_1");
-            trinoAdminClient.execute("CREATE SCHEMA lakehouse.customer_2");
+            trinoDataAnalyst1Client.execute("CREATE SCHEMA lakehouse.customer_1");
+            trinoDataAnalyst1Client.execute("CREATE SCHEMA lakehouse.customer_2");
 
             assertCatalogList(trinoAdminClient, "catalog_without_schemas_acls", "lakehouse", "system", "tpch");
             assertCatalogList(trinoSupersetClient);
-            assertCatalogList(trinoDataAnalyst1Client, "catalog_without_schemas_acls", "lakehouse");
-            assertCatalogList(trinoDataAnalyst2Client, "catalog_without_schemas_acls", "lakehouse");
+            assertCatalogList(trinoDataAnalyst1Client, "catalog_without_schemas_acls", "lakehouse", "tpch");
+            assertCatalogList(trinoDataAnalyst2Client, "catalog_without_schemas_acls", "lakehouse", "tpch");
             assertCatalogList(trinoCustomer1User1Client, "lakehouse");
             assertCatalogList(trinoCustomer2User1Client, "lakehouse");
 
@@ -390,7 +390,7 @@ public class OpaAuthorizerSystemTest
             assertSchemaList(trinoDataAnalyst1Client, "catalog_without_schemas_acls", "default", "information_schema");
             assertSchemaList(trinoDataAnalyst1Client, "lakehouse", "customer_1", "customer_2", "default", "information_schema");
             assertAccessDenied(trinoDataAnalyst1Client, "SHOW SCHEMAS IN system");
-            assertAccessDenied(trinoDataAnalyst1Client, "SHOW SCHEMAS IN tpch");
+            assertSchemaList(trinoDataAnalyst1Client, "tpch", "information_schema", "sf1", "sf100", "sf1000", "sf10000", "sf100000", "sf300", "sf3000", "sf30000", "tiny");
 
             assertAccessDenied(trinoCustomer1User1Client, "SHOW SCHEMAS IN catalog_without_schemas_acls");
             assertSchemaList(trinoCustomer1User1Client, "lakehouse", "customer_1");
@@ -401,6 +401,13 @@ public class OpaAuthorizerSystemTest
             assertSchemaList(trinoCustomer2User1Client, "lakehouse", "customer_2");
             assertAccessDenied(trinoCustomer2User1Client, "SHOW SCHEMAS IN system");
             assertAccessDenied(trinoCustomer2User1Client, "SHOW SCHEMAS IN tpch");
+
+            // Create tables with data for customers
+            trinoDataAnalyst1Client.execute("CREATE TABLE lakehouse.customer_1.nation AS SELECT * FROM tpch.tiny.nation");
+            trinoDataAnalyst1Client.execute("CREATE TABLE IF NOT EXISTS lakehouse.customer_2.nation AS SELECT * FROM tpch.tiny.nation");
+            trinoDataAnalyst1Client.execute("DROP TABLE lakehouse.customer_2.nation");
+            trinoDataAnalyst1Client.execute("CREATE TABLE lakehouse.customer_2.nation AS SELECT * FROM tpch.tiny.nation");
+            assertAccessDenied(trinoDataAnalyst1Client, "CREATE TABLE tpch.tiny.foo AS SELECT * FROM tpch.tiny.nation");
         }
     }
 
