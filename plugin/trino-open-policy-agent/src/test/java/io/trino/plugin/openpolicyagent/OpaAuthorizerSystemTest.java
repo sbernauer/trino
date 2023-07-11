@@ -452,6 +452,42 @@ public class OpaAuthorizerSystemTest
             trinoDataAnalyst1Client.execute("SELECT name FROM lakehouse.customer_1.public_export limit 1");
             trinoCustomer1User1Client.execute("SELECT name FROM lakehouse.customer_1.public_export limit 1");
             trinoCustomer2User1Client.execute("SELECT name FROM lakehouse.customer_1.public_export limit 1");
+
+            // Test SHOW CREATE statements
+            assertQueryReturns(trinoAdminClient, "SHOW CREATE SCHEMA lakehouse.customer_1", "CREATE SCHEMA lakehouse.customer_1");
+            assertQueryReturns(trinoDataAnalyst1Client, "SHOW CREATE SCHEMA lakehouse.customer_1", "CREATE SCHEMA lakehouse.customer_1");
+            assertQueryReturns(trinoCustomer1User1Client, "SHOW CREATE SCHEMA lakehouse.customer_1", "CREATE SCHEMA lakehouse.customer_1");
+            assertQueryReturns(trinoCustomer2User1Client, "SHOW CREATE SCHEMA lakehouse.customer_1", "CREATE SCHEMA lakehouse.customer_1");
+            assertAccessDenied(trinoCustomer1User1Client, "SHOW CREATE SCHEMA lakehouse.customer_2");
+
+            String createTableStatement = "CREATE TABLE lakehouse.customer_1.nation (\n" +
+                    "   nationkey bigint,\n" +
+                    "   name varchar(25),\n" +
+                    "   regionkey bigint,\n" +
+                    "   comment varchar(152)\n" +
+                    ")";
+            assertQueryReturns(trinoAdminClient, "SHOW CREATE TABLE lakehouse.customer_1.nation", createTableStatement);
+            assertQueryReturns(trinoDataAnalyst1Client, "SHOW CREATE TABLE lakehouse.customer_1.nation", createTableStatement);
+            assertQueryReturns(trinoCustomer1User1Client, "SHOW CREATE TABLE lakehouse.customer_1.nation", createTableStatement);
+            assertAccessDenied(trinoCustomer2User1Client, "SHOW CREATE TABLE lakehouse.customer_1.nation");
+
+            String createViewStatement = "CREATE VIEW lakehouse.customer_1.nation_view SECURITY DEFINER AS\n" +
+                    "SELECT *\n" +
+                    "FROM\n" +
+                    "  lakehouse.customer_1.nation";
+            assertQueryReturns(trinoAdminClient, "SHOW CREATE VIEW lakehouse.customer_1.nation_view", createViewStatement);
+            assertQueryReturns(trinoDataAnalyst1Client, "SHOW CREATE VIEW lakehouse.customer_1.nation_view", createViewStatement);
+            assertQueryReturns(trinoCustomer1User1Client, "SHOW CREATE VIEW lakehouse.customer_1.nation_view", createViewStatement);
+            assertAccessDenied(trinoCustomer2User1Client, "SHOW CREATE VIEW lakehouse.customer_1.nation_view");
+
+            createViewStatement = "CREATE VIEW lakehouse.customer_1.nation_view_security_invoker SECURITY INVOKER AS\n" +
+                    "SELECT *\n" +
+                    "FROM\n" +
+                    "  lakehouse.customer_1.nation";
+            assertQueryReturns(trinoAdminClient, "SHOW CREATE VIEW lakehouse.customer_1.nation_view_security_invoker", createViewStatement);
+            assertQueryReturns(trinoDataAnalyst1Client, "SHOW CREATE VIEW lakehouse.customer_1.nation_view_security_invoker", createViewStatement);
+            assertQueryReturns(trinoCustomer1User1Client, "SHOW CREATE VIEW lakehouse.customer_1.nation_view_security_invoker", createViewStatement);
+            assertAccessDenied(trinoCustomer2User1Client, "SHOW CREATE VIEW lakehouse.customer_1.nation_view_security_invoker");
         }
     }
 

@@ -21,7 +21,7 @@ extended[i] {
 
 # Every can execute queries
 allow {
-    input.action.operation in ["ExecuteQuery", "ExecuteFunction"]
+    input.action.operation in ["ExecuteQuery", "ExecuteFunction", "ReadSystemInformation"]
 }
 
 allow {
@@ -95,7 +95,16 @@ allow {
 
 allow {
     input.action.operation in [
+        "ShowCreateSchema",
+    ]
+
+    has_permission_for_any_table_in_schema(input.action.resource.schema.catalogName, input.action.resource.schema.schemaName, "ro")
+}
+
+allow {
+    input.action.operation in [
         "SelectFromColumns",
+        "ShowCreateTable"
     ]
 
     has_table_permission(input.action.resource.table.catalogName, input.action.resource.table.schemaName, input.action.resource.table.tableName, "ro")
