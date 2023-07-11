@@ -88,6 +88,14 @@ allow {
 
 allow {
     input.action.operation in [
+        "RefreshMaterializedView",
+    ]
+
+    has_table_permission(input.action.resource.view.catalogName, input.action.resource.view.schemaName, input.action.resource.view.tableName, "rw")
+}
+
+allow {
+    input.action.operation in [
         "InsertIntoTable",
         "DeleteFromTable",
         "TruncateTable",
@@ -136,6 +144,7 @@ allow {
 allow {
     input.action.operation in [
         "ShowCreateSchema",
+        "ShowTables",
     ]
 
     has_permission_for_any_table_in_schema(input.action.resource.schema.catalogName, input.action.resource.schema.schemaName, "ro")

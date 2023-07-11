@@ -3,8 +3,6 @@
 IMPLEMENTED AND TESTED
 
 * void checkCanExecuteQuery(SystemSecurityContext context)
-* public void checkCanExecuteFunction(SystemSecurityContext systemSecurityContext, String functionName)
-* public void checkCanExecuteFunction(SystemSecurityContext systemSecurityContext, FunctionKind functionKind, CatalogSchemaRoutineName functionName)
 * public void checkCanAccessCatalog(SystemSecurityContext context, String catalogName)
 * public void checkCanShowSchemas(SystemSecurityContext context, String catalogName)
 * public void checkCanCreateSchema(SystemSecurityContext context, CatalogSchemaName schema, Map<String, Object> properties)
@@ -28,6 +26,7 @@ IMPLEMENTED
 * public void checkCanSetUser(Optional<Principal> principal, String userName) => Not needed, as NOP in new version
 * public void checkCanSetCatalogSessionProperty(SystemSecurityContext context, String catalogName, String propertyName)
 * public void checkCanReadSystemInformation(SystemSecurityContext context)
+* public void checkCanShowTables(SystemSecurityContext context, CatalogSchemaName schema)
 * public void checkCanShowColumns(SystemSecurityContext context, CatalogSchemaTableName table)
 * public void checkCanViewQueryOwnedBy(SystemSecurityContext context, Identity queryOwner)
 * public void checkCanKillQueryOwnedBy(SystemSecurityContext context, Identity queryOwner)
@@ -41,28 +40,28 @@ IMPLEMENTED
 * public void checkCanTruncateTable(SystemSecurityContext context, CatalogSchemaTableName table)
 * public void checkCanSetTableProperties(SystemSecurityContext context, CatalogSchemaTableName table, Map<String, Optional<Object>> properties)
 * public void checkCanSetTableComment(SystemSecurityContext context, CatalogSchemaTableName table)
+* public void checkCanRenameView(SystemSecurityContext context, CatalogSchemaTableName view, CatalogSchemaTableName newView)
+* public void checkCanRenameMaterializedView(SystemSecurityContext context, CatalogSchemaTableName view, CatalogSchemaTableName newView)
 * public void checkCanCreateMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView, Map<String, Object> properties)
+* public void checkCanDropMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView)
+* public void checkCanSetMaterializedViewProperties(SystemSecurityContext context, CatalogSchemaTableName materializedView, Map<String, Optional<Object>> properties)
+* public void checkCanExecuteFunction(SystemSecurityContext systemSecurityContext, String functionName)
+* public void checkCanExecuteFunction(SystemSecurityContext systemSecurityContext, FunctionKind functionKind, CatalogSchemaRoutineName functionName)
+* public void checkCanRefreshMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView)
 
 NOT IMPLEMENTED
 
 * public void checkCanWriteSystemInformation(SystemSecurityContext context) => Not implemented, as only admins should be able to do so
 
 TODO
+
 * public void checkCanImpersonateUser(SystemSecurityContext context, String userName)
-* public void checkCanSetUser(Optional<Principal> principal, String userName)
 * public Collection<Identity> filterViewQueryOwnedBy(SystemSecurityContext context, Collection<Identity> queryOwners)
-* public void checkCanWriteSystemInformation(SystemSecurityContext context)
 * public void checkCanSetSystemSessionProperty(SystemSecurityContext context, String propertyName)
 * public void checkCanSetSchemaAuthorization(SystemSecurityContext context, CatalogSchemaName schema, TrinoPrincipal principal)
-* public void checkCanShowTables(SystemSecurityContext context, CatalogSchemaName schema)
 * public Set<String> filterColumns(SystemSecurityContext context, CatalogSchemaTableName table, Set<String> columns)
 * public void checkCanSetTableAuthorization(SystemSecurityContext context, CatalogSchemaTableName table, TrinoPrincipal principal)
-* public void checkCanRenameView(SystemSecurityContext context, CatalogSchemaTableName view, CatalogSchemaTableName newView)
 * public void checkCanSetViewAuthorization(SystemSecurityContext context, CatalogSchemaTableName view, TrinoPrincipal principal)
-* public void checkCanRefreshMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView)
-* public void checkCanSetMaterializedViewProperties(SystemSecurityContext context, CatalogSchemaTableName materializedView, Map<String, Optional<Object>> properties)
-* public void checkCanDropMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView)
-* public void checkCanRenameMaterializedView(SystemSecurityContext context, CatalogSchemaTableName view, CatalogSchemaTableName newView)
 * public void checkCanGrantExecuteFunctionPrivilege(SystemSecurityContext context, String functionName, TrinoPrincipal grantee, boolean grantOption)
 * public void checkCanGrantSchemaPrivilege(SystemSecurityContext context, Privilege privilege, CatalogSchemaName schema, TrinoPrincipal grantee, boolean grantOption)
 * public void checkCanDenySchemaPrivilege(SystemSecurityContext context, Privilege privilege, CatalogSchemaName schema, TrinoPrincipal grantee)
@@ -79,6 +78,4 @@ TODO
 * public void checkCanShowCurrentRoles(SystemSecurityContext context)
 * public void checkCanShowRoleGrants(SystemSecurityContext context)
 * public void checkCanExecuteProcedure(SystemSecurityContext systemSecurityContext, CatalogSchemaRoutineName procedure)
-* public void checkCanExecuteFunction(SystemSecurityContext systemSecurityContext, String functionName)
-* public void checkCanExecuteFunction(SystemSecurityContext systemSecurityContext, FunctionKind functionKind, CatalogSchemaRoutineName functionName)
 * public void checkCanExecuteTableProcedure(SystemSecurityContext systemSecurityContext, CatalogSchemaTableName table, String procedure)
