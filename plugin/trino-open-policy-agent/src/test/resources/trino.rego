@@ -243,6 +243,11 @@ has_table_permission(catalog, schema, table, permission) {
     has_schema_permission(catalog, schema, permission)
 }
 
+# Permissions granted on schema level are inherited for catalogs as well
+has_table_permission(catalog, schema, table, permission) {
+    has_catalog_permission(catalog, permission)
+}
+
 allow {
     input.action.operation in ["SelectFromColumns"]
     input.action.resource.table.schemaName = "information_schema"

@@ -427,10 +427,10 @@ public class OpaAuthorizerSystemTest
 
             // Try to access tables/views again
             assertQueryReturns(trinoDataAnalyst1Client, "SELECT COUNT(*) FROM lakehouse.customer_1.nation", "25");
-            assertQueryReturns(trinoDataAnalyst1Client,"SELECT COUNT(*) FROM lakehouse.customer_1.nation_view", "25");
-            assertQueryReturns(trinoDataAnalyst1Client,"SELECT COUNT(*) FROM lakehouse.customer_1.nation_view_security_invoker", "25");
-            assertQueryReturns(trinoCustomer1User1Client,"SELECT COUNT(*) FROM lakehouse.customer_1.nation", "25");
-            assertQueryReturns(trinoCustomer1User1Client,"SELECT COUNT(*) FROM lakehouse.customer_1.nation_view", "25");
+            assertQueryReturns(trinoDataAnalyst1Client, "SELECT COUNT(*) FROM lakehouse.customer_1.nation_view", "25");
+            assertQueryReturns(trinoDataAnalyst1Client, "SELECT COUNT(*) FROM lakehouse.customer_1.nation_view_security_invoker", "25");
+            assertQueryReturns(trinoCustomer1User1Client, "SELECT COUNT(*) FROM lakehouse.customer_1.nation", "25");
+            assertQueryReturns(trinoCustomer1User1Client, "SELECT COUNT(*) FROM lakehouse.customer_1.nation_view", "25");
             assertQueryReturns(trinoCustomer1User1Client, "SELECT COUNT(*) FROM lakehouse.customer_1.nation_view_security_invoker", "25");
             assertAccessDenied(trinoCustomer2User1Client, "SELECT COUNT(*) FROM lakehouse.customer_1.nation");
             // Besides the view having SECURITY DEFINER (default), customer-2 can not access the view itself
@@ -488,13 +488,25 @@ public class OpaAuthorizerSystemTest
             assertQueryReturns(trinoDataAnalyst1Client, "SHOW CREATE VIEW lakehouse.customer_1.nation_view_security_invoker", createViewStatement);
             assertQueryReturns(trinoCustomer1User1Client, "SHOW CREATE VIEW lakehouse.customer_1.nation_view_security_invoker", createViewStatement);
             assertAccessDenied(trinoCustomer2User1Client, "SHOW CREATE VIEW lakehouse.customer_1.nation_view_security_invoker");
+
+            // Test impersonation
+            // FIXME: This test doesn't work
+            // assertQueryWithImpersonationReturns(trinoAdminClient, "customer-1-user-1", "SHOW CATALOGS", "lakehouse", "system");
+            // assertQueryWithImpersonationReturns(trinoSupersetClient, "customer-1-user-1", "SHOW CATALOGS", "lakehouse", "system");
+            // assertQueryWithImpersonationReturns(trinoSupersetClient, "customer-1-user-1", "SHOW SCHEMAS IN lakehouse", "customer_1");
+            // assertQueryWithImpersonationReturns(trinoSupersetClient, "customer-2-user-1", "SHOW CATALOGS", "lakehouse", "system");
+            // assertQueryWithImpersonationReturns(trinoSupersetClient, "customer-2-user-1", "SHOW SCHEMAS IN lakehouse", "customer_1", "customer_2");
+
+            // Admin users can't be impersonated
+            // assertQueryWithImpersonationAccessDenied(trinoSupersetClient, "admin", "SHOW CATALOGS");
+            // assertQueryWithImpersonationAccessDenied(trinoCustomer1User1Client, "customer-2-user-1", "SHOW CATALOGS");
         }
     }
 
     private void assertQueryReturns(TestingTrinoClient trinoClient, String query, String... expected)
     {
-        List<String> rows = new ArrayList<>();
         MaterializedResult result = trinoClient.execute(query).getResult();
+        List<String> rows = new ArrayList<>();
         for (MaterializedRow row : result) {
             rows.add(row.getField(0).toString());
         }
@@ -515,6 +527,30 @@ public class OpaAuthorizerSystemTest
     {
         RuntimeException error = assertThrows(RuntimeException.class, () -> {
             trinoClient.execute(query);
+        });
+        assertTrue(error.getMessage().contains("Access Denied"), "Error must mention 'Access Denied': " + error.getMessage());
+    }
+
+    private void assertQueryWithImpersonationReturns(TestingTrinoClient trinoClient, String userToImpersonate, String query, String... expected)
+    {
+        Session impersonationSession = Session.builder(trinoClient.getDefaultSession())
+                .setIdentity(Identity.ofUser(userToImpersonate))
+                .build();
+        MaterializedResult result = trinoClient.execute(impersonationSession, query).getResult();
+        List<String> rows = new ArrayList<>();
+        for (MaterializedRow row : result) {
+            rows.add(row.getField(0).toString());
+        }
+        assertEquals(new ArrayList<>(Arrays.asList(expected)), rows);
+    }
+
+    private void assertQueryWithImpersonationAccessDenied(TestingTrinoClient trinoClient, String userToImpersonate, String query)
+    {
+        Session impersonationSession = Session.builder(trinoClient.getDefaultSession())
+                .setIdentity(Identity.forUser(userToImpersonate).withPrincipal(trinoClient.getDefaultSession().getIdentity().getPrincipal()).build())
+                .build();
+        RuntimeException error = assertThrows(RuntimeException.class, () -> {
+            trinoClient.execute(impersonationSession, query);
         });
         assertTrue(error.getMessage().contains("Access Denied"), "Error must mention 'Access Denied': " + error.getMessage());
     }

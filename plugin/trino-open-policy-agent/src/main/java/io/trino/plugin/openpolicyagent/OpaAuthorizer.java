@@ -138,7 +138,14 @@ public class OpaAuthorizer
     @Override
     public void checkCanSetUser(Optional<Principal> principal, String userName)
     {
-        // This method is deprecated and is called for any identity, let's no-op
+        // This function is called for every query, asking if the user can become themselves, resulting in e.g.
+        // Access Denied: Principal bob cannot become user bob
+        if (principal.isPresent() && principal.get().getName().equals(userName)) {
+            return;
+        }
+
+        SystemSecurityContext context = new SystemSecurityContext(new Identity.Builder(userName).withPrincipal(principal).build(), Optional.empty());
+        checkCanImpersonateUser(context, userName);
     }
 
     @Override
