@@ -426,32 +426,32 @@ public class OpaAuthorizerSystemTest
             // Materialized views not supported by Memory connector, something like Iceberg connector would be needed
 
             // Try to access tables/views again
-            trinoDataAnalyst1Client.execute("SELECT COUNT(*) FROM lakehouse.customer_1.nation");
-            trinoDataAnalyst1Client.execute("SELECT COUNT(*) FROM lakehouse.customer_1.nation_view");
-            trinoDataAnalyst1Client.execute("SELECT COUNT(*) FROM lakehouse.customer_1.nation_view_security_invoker");
-            trinoCustomer1User1Client.execute("SELECT COUNT(*) FROM lakehouse.customer_1.nation");
-            trinoCustomer1User1Client.execute("SELECT COUNT(*) FROM lakehouse.customer_1.nation_view");
-            trinoCustomer1User1Client.execute("SELECT COUNT(*) FROM lakehouse.customer_1.nation_view_security_invoker");
+            assertQueryReturns(trinoDataAnalyst1Client, "SELECT COUNT(*) FROM lakehouse.customer_1.nation", "25");
+            assertQueryReturns(trinoDataAnalyst1Client,"SELECT COUNT(*) FROM lakehouse.customer_1.nation_view", "25");
+            assertQueryReturns(trinoDataAnalyst1Client,"SELECT COUNT(*) FROM lakehouse.customer_1.nation_view_security_invoker", "25");
+            assertQueryReturns(trinoCustomer1User1Client,"SELECT COUNT(*) FROM lakehouse.customer_1.nation", "25");
+            assertQueryReturns(trinoCustomer1User1Client,"SELECT COUNT(*) FROM lakehouse.customer_1.nation_view", "25");
+            assertQueryReturns(trinoCustomer1User1Client, "SELECT COUNT(*) FROM lakehouse.customer_1.nation_view_security_invoker", "25");
             assertAccessDenied(trinoCustomer2User1Client, "SELECT COUNT(*) FROM lakehouse.customer_1.nation");
             // Besides the view having SECURITY DEFINER (default), customer-2 can not access the view itself
             assertAccessDenied(trinoCustomer2User1Client, "SELECT COUNT(*) FROM lakehouse.customer_1.nation_view");
             assertAccessDenied(trinoCustomer2User1Client, "SELECT COUNT(*) FROM lakehouse.customer_1.nation_view_security_invoker");
 
-            trinoDataAnalyst1Client.execute("SELECT * FROM lakehouse.customer_1.nation limit 1");
-            trinoDataAnalyst1Client.execute("SELECT * FROM lakehouse.customer_1.nation_view limit 1");
-            trinoDataAnalyst1Client.execute("SELECT * FROM lakehouse.customer_1.nation_view_security_invoker limit 1");
-            trinoCustomer1User1Client.execute("SELECT * FROM lakehouse.customer_1.nation limit 1");
-            trinoCustomer1User1Client.execute("SELECT * FROM lakehouse.customer_1.nation_view limit 1");
-            trinoCustomer1User1Client.execute("SELECT * FROM lakehouse.customer_1.nation_view_security_invoker limit 1");
-            assertAccessDenied(trinoCustomer2User1Client, "SELECT * FROM lakehouse.customer_1.nation limit 1");
-            assertAccessDenied(trinoCustomer2User1Client, "SELECT * FROM lakehouse.customer_1.nation_view limit 1");
-            assertAccessDenied(trinoCustomer2User1Client, "SELECT * FROM lakehouse.customer_1.nation_view_security_invoker limit 1");
+            assertQueryReturns(trinoDataAnalyst1Client, "SELECT name FROM lakehouse.customer_1.nation limit 1", "ALGERIA");
+            assertQueryReturns(trinoDataAnalyst1Client, "SELECT name FROM lakehouse.customer_1.nation_view limit 1", "ALGERIA");
+            assertQueryReturns(trinoDataAnalyst1Client, "SELECT name FROM lakehouse.customer_1.nation_view_security_invoker limit 1", "ALGERIA");
+            assertQueryReturns(trinoCustomer1User1Client, "SELECT name FROM lakehouse.customer_1.nation limit 1", "ALGERIA");
+            assertQueryReturns(trinoCustomer1User1Client, "SELECT name FROM lakehouse.customer_1.nation_view limit 1", "ALGERIA");
+            assertQueryReturns(trinoCustomer1User1Client, "SELECT name FROM lakehouse.customer_1.nation_view_security_invoker limit 1", "ALGERIA");
+            assertAccessDenied(trinoCustomer2User1Client, "SELECT name FROM lakehouse.customer_1.nation limit 1");
+            assertAccessDenied(trinoCustomer2User1Client, "SELECT name FROM lakehouse.customer_1.nation_view limit 1");
+            assertAccessDenied(trinoCustomer2User1Client, "SELECT name FROM lakehouse.customer_1.nation_view_security_invoker limit 1");
 
             // The table lakehouse.customer_1.public_export is public and can be access by anyone
-            trinoAdminClient.execute("SELECT * FROM lakehouse.customer_1.public_export limit 1");
-            trinoDataAnalyst1Client.execute("SELECT * FROM lakehouse.customer_1.public_export limit 1");
-            trinoCustomer1User1Client.execute("SELECT * FROM lakehouse.customer_1.public_export limit 1");
-            trinoCustomer2User1Client.execute("SELECT * FROM lakehouse.customer_1.public_export limit 1");
+            assertQueryReturns(trinoAdminClient, "SELECT name FROM lakehouse.customer_1.public_export limit 1", "ALGERIA");
+            trinoDataAnalyst1Client.execute("SELECT name FROM lakehouse.customer_1.public_export limit 1");
+            trinoCustomer1User1Client.execute("SELECT name FROM lakehouse.customer_1.public_export limit 1");
+            trinoCustomer2User1Client.execute("SELECT name FROM lakehouse.customer_1.public_export limit 1");
         }
     }
 
