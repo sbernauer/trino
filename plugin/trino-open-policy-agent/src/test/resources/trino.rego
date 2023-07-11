@@ -19,9 +19,15 @@ extended[i] {
     group_member("admin")
 }
 
-# Every can execute queries
+# Everyone can execute queries
 allow {
     input.action.operation in ["ExecuteQuery", "ExecuteFunction", "ReadSystemInformation"]
+}
+
+# Everyone can see and kill his own queries
+allow {
+    input.action.operation in ["ViewQueryOwnedBy", "KillQueryOwnedBy"]
+    input.action.resource.user.name == input.context.identity.user
 }
 
 allow {
