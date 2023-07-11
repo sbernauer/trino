@@ -62,7 +62,12 @@ allow {
     input.action.operation in [
         "CreateTable",
         "DropTable",
-        "CreateViewWithSelectFromColumns",
+        "CreateViewWithSelectFromColumns", # This creates the view, so it's basically treated the same way as "CreateTable"
+        "AddColumn",
+        "DropColumn",
+        "RenameColumn",
+        "UpdateTableColumns",
+        "SetColumnComment",
     ]
 
     has_table_permission(input.action.resource.table.catalogName, input.action.resource.table.schemaName, input.action.resource.table.tableName, "full")
