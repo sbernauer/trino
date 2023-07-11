@@ -62,15 +62,47 @@ allow {
     input.action.operation in [
         "CreateTable",
         "DropTable",
-        "CreateViewWithSelectFromColumns", # This creates the view, so it's basically treated the same way as "CreateTable"
         "AddColumn",
         "DropColumn",
         "RenameColumn",
         "UpdateTableColumns",
         "SetColumnComment",
+        "SetTableProperties",
+        "SetTableComment",
+        "CreateViewWithSelectFromColumns", # This has input.action.resource.table set instead of input.action.resource.view
     ]
 
     has_table_permission(input.action.resource.table.catalogName, input.action.resource.table.schemaName, input.action.resource.table.tableName, "full")
+}
+
+allow {
+    input.action.operation in [
+        "CreateView",
+        "DropView",
+        "DropMaterializedView",
+        "SetMaterializedViewProperties",
+    ]
+
+    has_table_permission(input.action.resource.view.catalogName, input.action.resource.view.schemaName, input.action.resource.view.tableName, "full")
+}
+
+allow {
+    input.action.operation in [
+        "InsertIntoTable",
+        "DeleteFromTable",
+        "TruncateTable",
+    ]
+
+    has_table_permission(input.action.resource.table.catalogName, input.action.resource.table.schemaName, input.action.resource.table.tableName, "rw")
+}
+
+allow {
+    input.action.operation in [
+        "SelectFromColumns",
+        "ShowCreateTable"
+    ]
+
+    has_table_permission(input.action.resource.table.catalogName, input.action.resource.table.schemaName, input.action.resource.table.tableName, "ro")
 }
 
 allow {
@@ -84,15 +116,12 @@ allow {
 
 allow {
     input.action.operation in [
-        "CreateView",
-        "DropView",
-        "CreateMaterializedView",
-        "DropMaterializedView",
+        "RenameView",
         "RenameMaterializedView",
-        "SetMaterializedViewProperties",
     ]
 
-    has_schema_permission(input.action.resource.view.catalogName, input.action.resource.view.schemaName, "full")
+    has_table_permission(input.action.resource.view.catalogName, input.action.resource.view.schemaName, input.action.resource.table.tableName, "full")
+    has_table_permission(input.action.targetResource.view.catalogName, input.action.targetResource.view.schemaName, input.action.targetResource.view.tableName, "full")
 }
 
 allow {
@@ -110,15 +139,6 @@ allow {
     ]
 
     has_permission_for_any_table_in_schema(input.action.resource.schema.catalogName, input.action.resource.schema.schemaName, "ro")
-}
-
-allow {
-    input.action.operation in [
-        "SelectFromColumns",
-        "ShowCreateTable"
-    ]
-
-    has_table_permission(input.action.resource.table.catalogName, input.action.resource.table.schemaName, input.action.resource.table.tableName, "ro")
 }
 
 extended[i] {

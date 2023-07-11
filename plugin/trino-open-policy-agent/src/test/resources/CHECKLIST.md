@@ -18,7 +18,9 @@ IMPLEMENTED AND TESTED
 * public Set<String> filterCatalogs(SystemSecurityContext context, Set<String> catalogs)
 * public Set<String> filterSchemas(SystemSecurityContext context, String catalogName, Set<String> schemaNames)
 * public Set<SchemaTableName> filterTables(SystemSecurityContext context, String catalogName, Set<SchemaTableName> tableNames)
+* public void checkCanCreateView(SystemSecurityContext context, CatalogSchemaTableName view)
 * public void checkCanCreateViewWithSelectFromColumns(SystemSecurityContext context, CatalogSchemaTableName table, Set<String> columns)
+* public void checkCanDropView(SystemSecurityContext context, CatalogSchemaTableName view)
 * public void checkCanSelectFromColumns(SystemSecurityContext context, CatalogSchemaTableName table, Set<String> columns)
 
 IMPLEMENTED
@@ -34,6 +36,12 @@ IMPLEMENTED
 * public void checkCanRenameColumn(SystemSecurityContext context, CatalogSchemaTableName table)
 * public void checkCanUpdateTableColumns(SystemSecurityContext securityContext, CatalogSchemaTableName table, Set<String> updatedColumnNames)
 * public void checkCanSetColumnComment(SystemSecurityContext context, CatalogSchemaTableName table)
+* public void checkCanInsertIntoTable(SystemSecurityContext context, CatalogSchemaTableName table)
+* public void checkCanDeleteFromTable(SystemSecurityContext context, CatalogSchemaTableName table)
+* public void checkCanTruncateTable(SystemSecurityContext context, CatalogSchemaTableName table)
+* public void checkCanSetTableProperties(SystemSecurityContext context, CatalogSchemaTableName table, Map<String, Optional<Object>> properties)
+* public void checkCanSetTableComment(SystemSecurityContext context, CatalogSchemaTableName table)
+* public void checkCanCreateMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView, Map<String, Object> properties)
 
 NOT IMPLEMENTED
 
@@ -46,19 +54,11 @@ TODO
 * public void checkCanWriteSystemInformation(SystemSecurityContext context)
 * public void checkCanSetSystemSessionProperty(SystemSecurityContext context, String propertyName)
 * public void checkCanSetSchemaAuthorization(SystemSecurityContext context, CatalogSchemaName schema, TrinoPrincipal principal)
-* public void checkCanSetTableProperties(SystemSecurityContext context, CatalogSchemaTableName table, Map<String, Optional<Object>> properties)
-* public void checkCanSetTableComment(SystemSecurityContext context, CatalogSchemaTableName table)
 * public void checkCanShowTables(SystemSecurityContext context, CatalogSchemaName schema)
 * public Set<String> filterColumns(SystemSecurityContext context, CatalogSchemaTableName table, Set<String> columns)
 * public void checkCanSetTableAuthorization(SystemSecurityContext context, CatalogSchemaTableName table, TrinoPrincipal principal)
-* public void checkCanInsertIntoTable(SystemSecurityContext context, CatalogSchemaTableName table)
-* public void checkCanDeleteFromTable(SystemSecurityContext context, CatalogSchemaTableName table)
-* public void checkCanTruncateTable(SystemSecurityContext context, CatalogSchemaTableName table)
-* public void checkCanCreateView(SystemSecurityContext context, CatalogSchemaTableName view)
 * public void checkCanRenameView(SystemSecurityContext context, CatalogSchemaTableName view, CatalogSchemaTableName newView)
 * public void checkCanSetViewAuthorization(SystemSecurityContext context, CatalogSchemaTableName view, TrinoPrincipal principal)
-* public void checkCanDropView(SystemSecurityContext context, CatalogSchemaTableName view)
-* public void checkCanCreateMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView, Map<String, Object> properties)
 * public void checkCanRefreshMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView)
 * public void checkCanSetMaterializedViewProperties(SystemSecurityContext context, CatalogSchemaTableName materializedView, Map<String, Optional<Object>> properties)
 * public void checkCanDropMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView)
