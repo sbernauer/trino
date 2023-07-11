@@ -44,6 +44,7 @@ allow {
     input.action.operation in [
         "CreateSchema",
         "DropSchema",
+        "ExecuteProcedure",
     ]
 
     has_schema_permission(input.action.resource.schema.catalogName, input.action.resource.schema.schemaName, "full")
@@ -69,6 +70,7 @@ allow {
         "SetColumnComment",
         "SetTableProperties",
         "SetTableComment",
+        "ExecuteTableProcedure",
         "CreateViewWithSelectFromColumns", # This has input.action.resource.table set instead of input.action.resource.view
     ]
 

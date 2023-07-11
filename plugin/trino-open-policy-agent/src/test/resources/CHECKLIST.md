@@ -48,6 +48,8 @@ IMPLEMENTED
 * public void checkCanExecuteFunction(SystemSecurityContext systemSecurityContext, String functionName)
 * public void checkCanExecuteFunction(SystemSecurityContext systemSecurityContext, FunctionKind functionKind, CatalogSchemaRoutineName functionName)
 * public void checkCanRefreshMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView)
+* public void checkCanExecuteProcedure(SystemSecurityContext systemSecurityContext, CatalogSchemaRoutineName procedure)
+* public void checkCanExecuteTableProcedure(SystemSecurityContext systemSecurityContext, CatalogSchemaTableName table, String procedure)
 
 NOT IMPLEMENTED
 
@@ -77,5 +79,3 @@ TODO
 * public void checkCanShowRoleAuthorizationDescriptors(SystemSecurityContext context)
 * public void checkCanShowCurrentRoles(SystemSecurityContext context)
 * public void checkCanShowRoleGrants(SystemSecurityContext context)
-* public void checkCanExecuteProcedure(SystemSecurityContext systemSecurityContext, CatalogSchemaRoutineName procedure)
-* public void checkCanExecuteTableProcedure(SystemSecurityContext systemSecurityContext, CatalogSchemaTableName table, String procedure)
