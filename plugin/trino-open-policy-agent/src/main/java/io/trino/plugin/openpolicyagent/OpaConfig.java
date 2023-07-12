@@ -15,7 +15,8 @@ package io.trino.plugin.openpolicyagent;
 
 import io.airlift.configuration.Config;
 import io.airlift.configuration.ConfigDescription;
-import jakarta.validation.constraints.NotNull;
+
+import javax.validation.constraints.NotNull;
 
 import java.net.URI;
 
