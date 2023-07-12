@@ -30,6 +30,21 @@ allow {
     input.action.resource.user.name == input.context.identity.user
 }
 
+# Every can impersonate themselves. This is required because otherwise we get errors such as
+# "Query 20230707_134621_00008_v3a6g failed: Access Denied: User alice cannot impersonate user alice"
+allow {
+    input.action.operation == "ImpersonateUser"
+    input.action.resource.user.name == input.context.identity.user
+}
+
+# "impersonating" group can impersonate others, but not the admin group members
+allow {
+    input.action.operation == "ImpersonateUser"
+    input.context.identity.principal.name in data.groups["impersonating"]
+
+    not user_is_group_member(input.action.resource.user.name, "admin")
+}
+
 allow {
     input.action.operation in [
         "AccessCatalog",

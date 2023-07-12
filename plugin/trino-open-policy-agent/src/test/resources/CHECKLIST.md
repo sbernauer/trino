@@ -24,6 +24,7 @@ IMPLEMENTED AND TESTED
 IMPLEMENTED
 
 * public void checkCanSetUser(Optional<Principal> principal, String userName) => Not needed, as NOP in new version
+* public void checkCanImpersonateUser(SystemSecurityContext context, String userName)
 * public void checkCanSetCatalogSessionProperty(SystemSecurityContext context, String catalogName, String propertyName)
 * public void checkCanReadSystemInformation(SystemSecurityContext context)
 * public void checkCanShowTables(SystemSecurityContext context, CatalogSchemaName schema)
@@ -57,7 +58,6 @@ NOT IMPLEMENTED
 
 TODO
 
-* public void checkCanImpersonateUser(SystemSecurityContext context, String userName)
 * public Collection<Identity> filterViewQueryOwnedBy(SystemSecurityContext context, Collection<Identity> queryOwners)
 * public void checkCanSetSystemSessionProperty(SystemSecurityContext context, String propertyName)
 * public void checkCanSetSchemaAuthorization(SystemSecurityContext context, CatalogSchemaName schema, TrinoPrincipal principal)
