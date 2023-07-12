@@ -1,0 +1,81 @@
+`cat plugin/trino-open-policy-agent/src/main/java/io/trino/plugin/openpolicyagent/OpaAuthorizer.java | grep 'public '` and some manual cleaning
+
+IMPLEMENTED AND TESTED
+
+* void checkCanExecuteQuery(SystemSecurityContext context)
+* public void checkCanAccessCatalog(SystemSecurityContext context, String catalogName)
+* public void checkCanShowSchemas(SystemSecurityContext context, String catalogName)
+* public void checkCanCreateSchema(SystemSecurityContext context, CatalogSchemaName schema, Map<String, Object> properties)
+* public void checkCanDropSchema(SystemSecurityContext context, CatalogSchemaName schema)
+* public void checkCanRenameSchema(SystemSecurityContext context, CatalogSchemaName schema, String newSchemaName)
+* public void checkCanCreateTable(SystemSecurityContext context, CatalogSchemaTableName table, Map<String, Object> properties)
+* public void checkCanDropTable(SystemSecurityContext context, CatalogSchemaTableName table)
+* public void checkCanRenameTable(SystemSecurityContext context, CatalogSchemaTableName table, CatalogSchemaTableName newTable)
+* public void checkCanShowCreateSchema(SystemSecurityContext context, CatalogSchemaName schemaName)
+* public void checkCanShowCreateTable(SystemSecurityContext context, CatalogSchemaTableName table)
+* public Set<String> filterCatalogs(SystemSecurityContext context, Set<String> catalogs)
+* public Set<String> filterSchemas(SystemSecurityContext context, String catalogName, Set<String> schemaNames)
+* public Set<SchemaTableName> filterTables(SystemSecurityContext context, String catalogName, Set<SchemaTableName> tableNames)
+* public void checkCanCreateView(SystemSecurityContext context, CatalogSchemaTableName view)
+* public void checkCanCreateViewWithSelectFromColumns(SystemSecurityContext context, CatalogSchemaTableName table, Set<String> columns)
+* public void checkCanDropView(SystemSecurityContext context, CatalogSchemaTableName view)
+* public void checkCanSelectFromColumns(SystemSecurityContext context, CatalogSchemaTableName table, Set<String> columns)
+
+IMPLEMENTED
+
+* public void checkCanSetUser(Optional<Principal> principal, String userName) => Not needed, as NOP in new version
+* public void checkCanImpersonateUser(SystemSecurityContext context, String userName)
+* public void checkCanSetCatalogSessionProperty(SystemSecurityContext context, String catalogName, String propertyName)
+* public void checkCanReadSystemInformation(SystemSecurityContext context)
+* public void checkCanShowTables(SystemSecurityContext context, CatalogSchemaName schema)
+* public void checkCanShowColumns(SystemSecurityContext context, CatalogSchemaTableName table)
+* public void checkCanViewQueryOwnedBy(SystemSecurityContext context, Identity queryOwner)
+* public void checkCanKillQueryOwnedBy(SystemSecurityContext context, Identity queryOwner)
+* public void checkCanAddColumn(SystemSecurityContext context, CatalogSchemaTableName table)
+* public void checkCanDropColumn(SystemSecurityContext context, CatalogSchemaTableName table)
+* public void checkCanRenameColumn(SystemSecurityContext context, CatalogSchemaTableName table)
+* public void checkCanUpdateTableColumns(SystemSecurityContext securityContext, CatalogSchemaTableName table, Set<String> updatedColumnNames)
+* public void checkCanSetColumnComment(SystemSecurityContext context, CatalogSchemaTableName table)
+* public void checkCanInsertIntoTable(SystemSecurityContext context, CatalogSchemaTableName table)
+* public void checkCanDeleteFromTable(SystemSecurityContext context, CatalogSchemaTableName table)
+* public void checkCanTruncateTable(SystemSecurityContext context, CatalogSchemaTableName table)
+* public void checkCanSetTableProperties(SystemSecurityContext context, CatalogSchemaTableName table, Map<String, Optional<Object>> properties)
+* public void checkCanSetTableComment(SystemSecurityContext context, CatalogSchemaTableName table)
+* public void checkCanRenameView(SystemSecurityContext context, CatalogSchemaTableName view, CatalogSchemaTableName newView)
+* public void checkCanRenameMaterializedView(SystemSecurityContext context, CatalogSchemaTableName view, CatalogSchemaTableName newView)
+* public void checkCanCreateMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView, Map<String, Object> properties)
+* public void checkCanDropMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView)
+* public void checkCanSetMaterializedViewProperties(SystemSecurityContext context, CatalogSchemaTableName materializedView, Map<String, Optional<Object>> properties)
+* public void checkCanExecuteFunction(SystemSecurityContext systemSecurityContext, String functionName)
+* public void checkCanExecuteFunction(SystemSecurityContext systemSecurityContext, FunctionKind functionKind, CatalogSchemaRoutineName functionName)
+* public void checkCanRefreshMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView)
+* public void checkCanExecuteProcedure(SystemSecurityContext systemSecurityContext, CatalogSchemaRoutineName procedure)
+* public void checkCanExecuteTableProcedure(SystemSecurityContext systemSecurityContext, CatalogSchemaTableName table, String procedure)
+
+NOT IMPLEMENTED
+
+* public void checkCanWriteSystemInformation(SystemSecurityContext context) => Not implemented, as only admins should be able to do so
+
+TODO
+
+* public Collection<Identity> filterViewQueryOwnedBy(SystemSecurityContext context, Collection<Identity> queryOwners)
+* public void checkCanSetSystemSessionProperty(SystemSecurityContext context, String propertyName)
+* public void checkCanSetSchemaAuthorization(SystemSecurityContext context, CatalogSchemaName schema, TrinoPrincipal principal)
+* public Set<String> filterColumns(SystemSecurityContext context, CatalogSchemaTableName table, Set<String> columns)
+* public void checkCanSetTableAuthorization(SystemSecurityContext context, CatalogSchemaTableName table, TrinoPrincipal principal)
+* public void checkCanSetViewAuthorization(SystemSecurityContext context, CatalogSchemaTableName view, TrinoPrincipal principal)
+* public void checkCanGrantExecuteFunctionPrivilege(SystemSecurityContext context, String functionName, TrinoPrincipal grantee, boolean grantOption)
+* public void checkCanGrantSchemaPrivilege(SystemSecurityContext context, Privilege privilege, CatalogSchemaName schema, TrinoPrincipal grantee, boolean grantOption)
+* public void checkCanDenySchemaPrivilege(SystemSecurityContext context, Privilege privilege, CatalogSchemaName schema, TrinoPrincipal grantee)
+* public void checkCanRevokeSchemaPrivilege(SystemSecurityContext context, Privilege privilege, CatalogSchemaName schema, TrinoPrincipal revokee, boolean grantOption)
+* public void checkCanGrantTablePrivilege(SystemSecurityContext context, Privilege privilege, CatalogSchemaTableName table, TrinoPrincipal grantee, boolean grantOption)
+* public void checkCanDenyTablePrivilege(SystemSecurityContext context, Privilege privilege, CatalogSchemaTableName table, TrinoPrincipal grantee)
+* public void checkCanRevokeTablePrivilege(SystemSecurityContext context, Privilege privilege, CatalogSchemaTableName table, TrinoPrincipal revokee, boolean grantOption)
+* public void checkCanShowRoles(SystemSecurityContext context)
+* public void checkCanCreateRole(SystemSecurityContext context, String role, Optional<TrinoPrincipal> grantor)
+* public void checkCanDropRole(SystemSecurityContext context, String role)
+* public void checkCanGrantRoles(SystemSecurityContext context, Set<String> roles, Set<TrinoPrincipal> grantees, boolean adminOption, Optional<TrinoPrincipal> grantor)
+* public void checkCanRevokeRoles(SystemSecurityContext context, Set<String> roles, Set<TrinoPrincipal> grantees, boolean adminOption, Optional<TrinoPrincipal> grantor)
+* public void checkCanShowRoleAuthorizationDescriptors(SystemSecurityContext context)
+* public void checkCanShowCurrentRoles(SystemSecurityContext context)
+* public void checkCanShowRoleGrants(SystemSecurityContext context)
