@@ -182,7 +182,7 @@ extended[i] {
 extended[i] {
     input.action.operation == "FilterTables"
     some i
-    has_table_permission(input.action.filterResources[i].schema.catalogName, input.action.filterResources[i].schema.schemaName, input.action.filterResources[i].schema.tableName, "ro")
+    has_table_permission(input.action.filterResources[i].table.catalogName, input.action.filterResources[i].table.schemaName, input.action.filterResources[i].table.tableName, "ro")
 }
 
 grant_hierarchy := {
@@ -266,7 +266,7 @@ has_table_permission(catalog, schema, table, permission) {
 allow {
     input.action.operation in ["SelectFromColumns"]
     input.action.resource.table.schemaName = "information_schema"
-    input.action.resource.table.tableName = "schemata"
+    input.action.resource.table.tableName in ["schemata", "tables", "views", "columns"]
     has_permission_for_any_table_in_catalog(input.action.resource.table.catalogName, "ro")
 }
 
@@ -309,7 +309,7 @@ has_permission_for_any_table_in_catalog(catalog, permission) {
 data := {
     "groups" : {
         "admin": ["admin"], # Special group that can do everything
-        "impersonating": ["superset"], # Special group that can nothing besides impersonating others (but not admins)
+        "impersonating": ["superset"], # Special group that can do nothing besides impersonating others (but not admin group members)
 
         # Normal users groups
         "data-analysts": ["data-analyst-1", "data-analyst-2", "data-analyst-3"],
