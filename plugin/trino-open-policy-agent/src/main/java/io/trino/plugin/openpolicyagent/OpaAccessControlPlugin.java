@@ -13,10 +13,9 @@
  */
 package io.trino.plugin.openpolicyagent;
 
+import com.google.common.collect.ImmutableList;
 import io.trino.spi.Plugin;
 import io.trino.spi.security.SystemAccessControlFactory;
-
-import java.util.Collections;
 
 public class OpaAccessControlPlugin
         implements Plugin
@@ -24,6 +23,6 @@ public class OpaAccessControlPlugin
     @Override
     public Iterable<SystemAccessControlFactory> getSystemAccessControlFactories()
     {
-        return Collections.singleton(new OpaAccessControlFactory());
+        return ImmutableList.of(new OpaAccessControlFactory());
     }
 }

@@ -19,6 +19,7 @@ import io.airlift.configuration.ConfigDescription;
 import javax.validation.constraints.NotNull;
 
 import java.net.URI;
+import java.util.Optional;
 
 public class OpaConfig
 {
@@ -47,8 +48,8 @@ public class OpaConfig
         return opaUri;
     }
 
-    public URI getOpaBatchUri()
+    public Optional<URI> getOpaBatchUri()
     {
-        return opaBatchUri;
+        return Optional.ofNullable(opaBatchUri);
     }
 }

@@ -39,7 +39,10 @@ public class OpaAccessControlFactory
 
         Bootstrap app = new Bootstrap(new OpaAccessControlModule());
 
-        Injector injector = app.doNotInitializeLogging().setRequiredConfigurationProperties(config).initialize();
+        Injector injector = app
+                .doNotInitializeLogging()
+                .setRequiredConfigurationProperties(config)
+                .initialize();
         return injector.getInstance(Key.get(SystemAccessControl.class, ForOpa.class));
     }
 }

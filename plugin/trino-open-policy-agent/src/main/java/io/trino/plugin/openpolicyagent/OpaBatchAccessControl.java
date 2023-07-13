@@ -45,13 +45,13 @@ public class OpaBatchAccessControl
     public OpaBatchAccessControl(OpaConfig config)
     {
         super(config);
-        this.opaBatchedPolicyUri = config.getOpaBatchUri();
+        this.opaBatchedPolicyUri = config.getOpaBatchUri().orElseThrow();
     }
 
     public OpaBatchAccessControl(OpaConfig config, HttpClient httpClient)
     {
         super(config, httpClient);
-        this.opaBatchedPolicyUri = config.getOpaBatchUri();
+        this.opaBatchedPolicyUri = config.getOpaBatchUri().orElseThrow();
     }
 
     private List<Integer> batchQueryOpa(OpaQueryInput input)

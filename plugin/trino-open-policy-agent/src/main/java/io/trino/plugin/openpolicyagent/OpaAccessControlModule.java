@@ -31,7 +31,7 @@ public class OpaAccessControlModule
         configBinder(binder).bindConfig(OpaConfig.class);
         install(conditionalModule(
                 OpaConfig.class,
-                config -> config.getOpaBatchUri() != null,
+                config -> config.getOpaBatchUri().isPresent(),
                 new OpaBatchAccessControlModule(),
                 new OpaSingleAuthorizerModule()));
     }
