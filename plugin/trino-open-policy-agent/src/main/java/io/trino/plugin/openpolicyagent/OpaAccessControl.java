@@ -38,10 +38,74 @@ import java.net.http.HttpResponse;
 import java.security.Principal;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import static io.trino.spi.security.AccessDeniedException.denyAddColumn;
+import static io.trino.spi.security.AccessDeniedException.denyCatalogAccess;
+import static io.trino.spi.security.AccessDeniedException.denyCommentColumn;
+import static io.trino.spi.security.AccessDeniedException.denyCommentTable;
+import static io.trino.spi.security.AccessDeniedException.denyCreateMaterializedView;
+import static io.trino.spi.security.AccessDeniedException.denyCreateRole;
+import static io.trino.spi.security.AccessDeniedException.denyCreateSchema;
+import static io.trino.spi.security.AccessDeniedException.denyCreateTable;
+import static io.trino.spi.security.AccessDeniedException.denyCreateView;
+import static io.trino.spi.security.AccessDeniedException.denyCreateViewWithSelect;
+import static io.trino.spi.security.AccessDeniedException.denyDeleteTable;
+import static io.trino.spi.security.AccessDeniedException.denyDenySchemaPrivilege;
+import static io.trino.spi.security.AccessDeniedException.denyDenyTablePrivilege;
+import static io.trino.spi.security.AccessDeniedException.denyDropColumn;
+import static io.trino.spi.security.AccessDeniedException.denyDropMaterializedView;
+import static io.trino.spi.security.AccessDeniedException.denyDropRole;
+import static io.trino.spi.security.AccessDeniedException.denyDropSchema;
+import static io.trino.spi.security.AccessDeniedException.denyDropTable;
+import static io.trino.spi.security.AccessDeniedException.denyDropView;
+import static io.trino.spi.security.AccessDeniedException.denyExecuteFunction;
+import static io.trino.spi.security.AccessDeniedException.denyExecuteProcedure;
+import static io.trino.spi.security.AccessDeniedException.denyExecuteQuery;
+import static io.trino.spi.security.AccessDeniedException.denyExecuteTableProcedure;
+import static io.trino.spi.security.AccessDeniedException.denyGrantExecuteFunctionPrivilege;
+import static io.trino.spi.security.AccessDeniedException.denyGrantRoles;
+import static io.trino.spi.security.AccessDeniedException.denyGrantSchemaPrivilege;
+import static io.trino.spi.security.AccessDeniedException.denyGrantTablePrivilege;
+import static io.trino.spi.security.AccessDeniedException.denyImpersonateUser;
+import static io.trino.spi.security.AccessDeniedException.denyInsertTable;
+import static io.trino.spi.security.AccessDeniedException.denyKillQuery;
+import static io.trino.spi.security.AccessDeniedException.denyReadSystemInformationAccess;
+import static io.trino.spi.security.AccessDeniedException.denyRefreshMaterializedView;
+import static io.trino.spi.security.AccessDeniedException.denyRenameColumn;
+import static io.trino.spi.security.AccessDeniedException.denyRenameMaterializedView;
+import static io.trino.spi.security.AccessDeniedException.denyRenameSchema;
+import static io.trino.spi.security.AccessDeniedException.denyRenameTable;
+import static io.trino.spi.security.AccessDeniedException.denyRenameView;
+import static io.trino.spi.security.AccessDeniedException.denyRevokeRoles;
+import static io.trino.spi.security.AccessDeniedException.denyRevokeSchemaPrivilege;
+import static io.trino.spi.security.AccessDeniedException.denyRevokeTablePrivilege;
+import static io.trino.spi.security.AccessDeniedException.denySelectColumns;
+import static io.trino.spi.security.AccessDeniedException.denySetCatalogSessionProperty;
+import static io.trino.spi.security.AccessDeniedException.denySetMaterializedViewProperties;
+import static io.trino.spi.security.AccessDeniedException.denySetSchemaAuthorization;
+import static io.trino.spi.security.AccessDeniedException.denySetSystemSessionProperty;
+import static io.trino.spi.security.AccessDeniedException.denySetTableAuthorization;
+import static io.trino.spi.security.AccessDeniedException.denySetTableProperties;
+import static io.trino.spi.security.AccessDeniedException.denySetViewAuthorization;
+import static io.trino.spi.security.AccessDeniedException.denyShowColumns;
+import static io.trino.spi.security.AccessDeniedException.denyShowCreateSchema;
+import static io.trino.spi.security.AccessDeniedException.denyShowCreateTable;
+import static io.trino.spi.security.AccessDeniedException.denyShowCurrentRoles;
+import static io.trino.spi.security.AccessDeniedException.denyShowRoleAuthorizationDescriptors;
+import static io.trino.spi.security.AccessDeniedException.denyShowRoleGrants;
+import static io.trino.spi.security.AccessDeniedException.denyShowRoles;
+import static io.trino.spi.security.AccessDeniedException.denyShowSchemas;
+import static io.trino.spi.security.AccessDeniedException.denyShowTables;
+import static io.trino.spi.security.AccessDeniedException.denyTruncateTable;
+import static io.trino.spi.security.AccessDeniedException.denyUpdateTableColumns;
+import static io.trino.spi.security.AccessDeniedException.denyViewQuery;
+import static io.trino.spi.security.AccessDeniedException.denyWriteSystemInformationAccess;
+import static java.lang.String.format;
 
 public class OpaAccessControl
         implements SystemAccessControl
@@ -102,6 +166,11 @@ public class OpaAccessControl
         }
     }
 
+    private static String trinoPrincipalToString(TrinoPrincipal principal)
+    {
+        return format("%s '%s'", principal.getType().name().toLowerCase(Locale.ENGLISH), principal.getName());
+    }
+
     protected boolean queryOpa(OpaQueryInput input)
     {
         OpaQueryResult result = tryGetResponseFromOpa(input, opaPolicyUri, OpaQueryResult.class);
@@ -131,7 +200,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().user(new OpaQueryInputResource.User(userName)).build();
 
         if (!queryOpaWithSimpleResource(context, "ImpersonateUser", resource)) {
-            SystemAccessControl.super.checkCanImpersonateUser(context, userName);
+            denyImpersonateUser(context.getIdentity().getUser(), userName);
         }
     }
 
@@ -145,7 +214,7 @@ public class OpaAccessControl
     public void checkCanExecuteQuery(SystemSecurityContext context)
     {
         if (!queryOpaWithSimpleAction(context, "ExecuteQuery")) {
-            SystemAccessControl.super.checkCanExecuteQuery(context);
+            denyExecuteQuery();
         }
     }
 
@@ -154,7 +223,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().user(new OpaQueryInputResource.User(queryOwner)).build();
         if (!queryOpaWithSimpleResource(context, "ViewQueryOwnedBy", resource)) {
-            SystemAccessControl.super.checkCanViewQueryOwnedBy(context, queryOwner);
+            denyViewQuery();
         }
     }
 
@@ -170,7 +239,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().user(new OpaQueryInputResource.User(queryOwner)).build();
 
         if (!queryOpaWithSimpleResource(context, "KillQueryOwnedBy", resource)) {
-            SystemAccessControl.super.checkCanKillQueryOwnedBy(context, queryOwner);
+            denyKillQuery();
         }
     }
 
@@ -178,7 +247,7 @@ public class OpaAccessControl
     public void checkCanReadSystemInformation(SystemSecurityContext context)
     {
         if (!queryOpaWithSimpleAction(context, "ReadSystemInformation")) {
-            SystemAccessControl.super.checkCanReadSystemInformation(context);
+            denyReadSystemInformationAccess();
         }
     }
 
@@ -186,7 +255,7 @@ public class OpaAccessControl
     public void checkCanWriteSystemInformation(SystemSecurityContext context)
     {
         if (!queryOpaWithSimpleAction(context, "WriteSystemInformation")) {
-            SystemAccessControl.super.checkCanWriteSystemInformation(context);
+            denyWriteSystemInformationAccess();
         }
     }
 
@@ -196,7 +265,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().systemSessionProperty(propertyName).build();
 
         if (!queryOpaWithSimpleResource(context, "SetSystemSessionProperty", resource)) {
-            SystemAccessControl.super.checkCanSetSystemSessionProperty(context, propertyName);
+            denySetSystemSessionProperty(propertyName);
         }
     }
 
@@ -205,7 +274,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().catalog(catalogName).build();
         if (!queryOpaWithSimpleResource(context, "AccessCatalog", resource)) {
-            SystemAccessControl.super.checkCanAccessCatalog(context, catalogName);
+            denyCatalogAccess(catalogName);
         }
     }
 
@@ -220,7 +289,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().schema(new OpaQueryInputResource.CatalogSchema(schema, properties)).build();
         if (!queryOpaWithSimpleResource(context, "CreateSchema", resource)) {
-            SystemAccessControl.super.checkCanCreateSchema(context, schema, properties);
+            denyCreateSchema(schema.toString());
         }
     }
 
@@ -229,7 +298,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().schema(new OpaQueryInputResource.CatalogSchema(schema)).build();
         if (!queryOpaWithSimpleResource(context, "DropSchema", resource)) {
-            SystemAccessControl.super.checkCanDropSchema(context, schema);
+            denyDropSchema(schema.toString());
         }
     }
 
@@ -242,7 +311,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanRenameSchema(context, schema, newSchemaName);
+            denyRenameSchema(schema.toString(), newSchemaName);
         }
     }
 
@@ -255,7 +324,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanSetSchemaAuthorization(context, schema, principal);
+            denySetSchemaAuthorization(schema.toString(), principal);
         }
     }
 
@@ -264,7 +333,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().catalog(catalogName).build();
         if (!queryOpaWithSimpleResource(context, "ShowSchemas", resource)) {
-            SystemAccessControl.super.checkCanShowSchemas(context, catalogName);
+            denyShowSchemas();
         }
     }
 
@@ -279,7 +348,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().schema(new OpaQueryInputResource.CatalogSchema(schemaName)).build();
         if (!queryOpaWithSimpleResource(context, "ShowCreateSchema", resource)) {
-            SystemAccessControl.super.checkCanShowCreateSchema(context, schemaName);
+            denyShowCreateSchema(schemaName.toString());
         }
     }
 
@@ -288,7 +357,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table)).build();
         if (!queryOpaWithSimpleResource(context, "ShowCreateTable", resource)) {
-            SystemAccessControl.super.checkCanShowCreateTable(context, table);
+            denyShowCreateTable(table.toString());
         }
     }
 
@@ -297,7 +366,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table, properties)).build();
         if (!queryOpaWithSimpleResource(context, "CreateTable", resource)) {
-            SystemAccessControl.super.checkCanCreateTable(context, table, properties);
+            denyCreateTable(table.toString());
         }
     }
 
@@ -306,7 +375,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table)).build();
         if (!queryOpaWithSimpleResource(context, "DropTable", resource)) {
-            SystemAccessControl.super.checkCanDropTable(context, table);
+            denyDropTable(table.toString());
         }
     }
 
@@ -319,7 +388,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanRenameTable(context, table, newTable);
+            denyRenameTable(table.toString(), newTable.toString());
         }
     }
 
@@ -334,7 +403,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table, transformedProperties)).build();
 
         if (!queryOpaWithSimpleResource(context, "SetTableProperties", resource)) {
-            SystemAccessControl.super.checkCanSetTableProperties(context, table, properties);
+            denySetTableProperties(table.toString());
         }
     }
 
@@ -343,7 +412,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table)).build();
         if (!queryOpaWithSimpleResource(context, "SetTableComment", resource)) {
-            SystemAccessControl.super.checkCanSetTableComment(context, table);
+            denyCommentTable(table.toString());
         }
     }
 
@@ -352,7 +421,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table)).build();
         if (!queryOpaWithSimpleResource(context, "SetColumnComment", resource)) {
-            SystemAccessControl.super.checkCanSetColumnComment(context, table);
+            denyCommentColumn(table.toString());
         }
     }
 
@@ -361,7 +430,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().schema(new OpaQueryInputResource.CatalogSchema(schema)).build();
         if (!queryOpaWithSimpleResource(context, "ShowTables", resource)) {
-            SystemAccessControl.super.checkCanShowTables(context, schema);
+            denyShowTables(schema.toString());
         }
     }
 
@@ -376,7 +445,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table)).build();
         if (!queryOpaWithSimpleResource(context, "ShowColumns", resource)) {
-            SystemAccessControl.super.checkCanShowColumns(context, table);
+            denyShowColumns(table.toString());
         }
     }
 
@@ -391,7 +460,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table)).build();
         if (!queryOpaWithSimpleResource(context, "AddColumn", resource)) {
-            SystemAccessControl.super.checkCanAddColumn(context, table);
+            denyAddColumn(table.toString());
         }
     }
 
@@ -400,7 +469,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table)).build();
         if (!queryOpaWithSimpleResource(context, "DropColumn", resource)) {
-            SystemAccessControl.super.checkCanDropColumn(context, table);
+            denyDropColumn(table.toString());
         }
     }
 
@@ -413,7 +482,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanSetTableAuthorization(context, table, principal);
+            denySetTableAuthorization(table.toString(), principal);
         }
     }
 
@@ -422,7 +491,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table)).build();
         if (!queryOpaWithSimpleResource(context, "RenameColumn", resource)) {
-            SystemAccessControl.super.checkCanRenameColumn(context, table);
+            denyRenameColumn(table.toString());
         }
     }
 
@@ -431,7 +500,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table, columns)).build();
         if (!queryOpaWithSimpleResource(context, "SelectFromColumns", resource)) {
-            SystemAccessControl.super.checkCanSelectFromColumns(context, table, columns);
+            denySelectColumns(table.toString(), columns);
         }
     }
 
@@ -440,7 +509,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table)).build();
         if (!queryOpaWithSimpleResource(context, "InsertIntoTable", resource)) {
-            SystemAccessControl.super.checkCanInsertIntoTable(context, table);
+            denyInsertTable(table.toString());
         }
     }
 
@@ -449,7 +518,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table)).build();
         if (!queryOpaWithSimpleResource(context, "DeleteFromTable", resource)) {
-            SystemAccessControl.super.checkCanDeleteFromTable(context, table);
+            denyDeleteTable(table.toString());
         }
     }
 
@@ -458,7 +527,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table)).build();
         if (!queryOpaWithSimpleResource(context, "TruncateTable", resource)) {
-            SystemAccessControl.super.checkCanTruncateTable(context, table);
+            denyTruncateTable(table.toString());
         }
     }
 
@@ -468,7 +537,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table, updatedColumnNames)).build();
 
         if (!queryOpaWithSimpleResource(securityContext, "UpdateTableColumns", resource)) {
-            SystemAccessControl.super.checkCanUpdateTableColumns(securityContext, table, updatedColumnNames);
+            denyUpdateTableColumns(table.toString(), updatedColumnNames);
         }
     }
 
@@ -477,7 +546,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().view(new OpaQueryInputResource.Table(view)).build();
         if (!queryOpaWithSimpleResource(context, "CreateView", resource)) {
-            SystemAccessControl.super.checkCanCreateView(context, view);
+            denyCreateView(view.toString());
         }
     }
 
@@ -490,7 +559,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanRenameView(context, view, newView);
+            denyRenameView(view.toString(), newView.toString());
         }
     }
 
@@ -503,7 +572,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanSetViewAuthorization(context, view, principal);
+            denySetViewAuthorization(view.toString(), principal);
         }
     }
 
@@ -512,7 +581,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().view(new OpaQueryInputResource.Table(view)).build();
         if (!queryOpaWithSimpleResource(context, "DropView", resource)) {
-            SystemAccessControl.super.checkCanDropView(context, view);
+            denyDropView(view.toString());
         }
     }
 
@@ -522,7 +591,7 @@ public class OpaAccessControl
         // This refers to a Table, so the resource should be a table and not a view
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table, columns)).build();
         if (!queryOpaWithSimpleResource(context, "CreateViewWithSelectFromColumns", resource)) {
-            SystemAccessControl.super.checkCanCreateViewWithSelectFromColumns(context, table, columns);
+            denyCreateViewWithSelect(table.toString(), context.getIdentity());
         }
     }
 
@@ -531,7 +600,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().view(new OpaQueryInputResource.Table(materializedView, properties)).build();
         if (!queryOpaWithSimpleResource(context, "CreateMaterializedView", resource)) {
-            SystemAccessControl.super.checkCanCreateMaterializedView(context, materializedView, properties);
+            denyCreateMaterializedView(materializedView.toString());
         }
     }
 
@@ -540,7 +609,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().view(new OpaQueryInputResource.Table(materializedView)).build();
         if (!queryOpaWithSimpleResource(context, "RefreshMaterializedView", resource)) {
-            SystemAccessControl.super.checkCanRefreshMaterializedView(context, materializedView);
+            denyRefreshMaterializedView(materializedView.toString());
         }
     }
 
@@ -554,7 +623,7 @@ public class OpaAccessControl
 
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().view(new OpaQueryInputResource.Table(materializedView, transformedProperties)).build();
         if (!queryOpaWithSimpleResource(context, "SetMaterializedViewProperties", resource)) {
-            SystemAccessControl.super.checkCanSetMaterializedViewProperties(context, materializedView, properties);
+            denySetMaterializedViewProperties(materializedView.toString());
         }
     }
 
@@ -563,7 +632,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().view(new OpaQueryInputResource.Table(materializedView)).build();
         if (!queryOpaWithSimpleResource(context, "DropMaterializedView", resource)) {
-            SystemAccessControl.super.checkCanDropMaterializedView(context, materializedView);
+            denyDropMaterializedView(materializedView.toString());
         }
     }
 
@@ -577,7 +646,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanRenameMaterializedView(context, view, newView);
+            denyRenameMaterializedView(view.toString(), newView.toString());
         }
     }
 
@@ -590,7 +659,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanGrantExecuteFunctionPrivilege(context, functionName, grantee, grantOption);
+            denyGrantExecuteFunctionPrivilege(functionName, context.getIdentity(), trinoPrincipalToString(grantee));
         }
     }
 
@@ -602,7 +671,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanSetCatalogSessionProperty(context, catalogName, propertyName);
+            denySetCatalogSessionProperty(propertyName);
         }
     }
 
@@ -615,7 +684,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanGrantSchemaPrivilege(context, privilege, schema, grantee, grantOption);
+            denyGrantSchemaPrivilege(privilege.toString(), schema.toString());
         }
     }
 
@@ -628,7 +697,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanDenySchemaPrivilege(context, privilege, schema, grantee);
+            denyDenySchemaPrivilege(privilege.toString(), schema.toString());
         }
     }
 
@@ -641,7 +710,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanRevokeSchemaPrivilege(context, privilege, schema, revokee, grantOption);
+            denyRevokeSchemaPrivilege(privilege.toString(), schema.toString());
         }
     }
 
@@ -654,7 +723,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanGrantTablePrivilege(context, privilege, table, grantee, grantOption);
+            denyGrantTablePrivilege(privilege.toString(), table.toString());
         }
     }
 
@@ -667,7 +736,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanDenyTablePrivilege(context, privilege, table, grantee);
+            denyDenyTablePrivilege(privilege.toString(), table.toString());
         }
     }
 
@@ -680,7 +749,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanRevokeTablePrivilege(context, privilege, table, revokee, grantOption);
+            denyRevokeTablePrivilege(privilege.toString(), table.toString());
         }
     }
 
@@ -688,7 +757,7 @@ public class OpaAccessControl
     public void checkCanShowRoles(SystemSecurityContext context)
     {
         if (!queryOpaWithSimpleAction(context, "ShowRoles")) {
-            SystemAccessControl.super.checkCanShowRoles(context);
+            denyShowRoles();
         }
     }
 
@@ -700,7 +769,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanCreateRole(context, role, grantor);
+            denyCreateRole(role);
         }
     }
 
@@ -709,7 +778,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().role(role).build();
         if (!queryOpaWithSimpleResource(context, "DropRole", resource)) {
-            SystemAccessControl.super.checkCanDropRole(context, role);
+            denyDropRole(role);
         }
     }
 
@@ -722,7 +791,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanGrantRoles(context, roles, grantees, adminOption, grantor);
+            denyGrantRoles(roles, grantees);
         }
     }
 
@@ -735,7 +804,7 @@ public class OpaAccessControl
         OpaQueryInput input = new OpaQueryInput(context, action);
 
         if (!queryOpa(input)) {
-            SystemAccessControl.super.checkCanRevokeRoles(context, roles, grantees, adminOption, grantor);
+            denyRevokeRoles(roles, grantees);
         }
     }
 
@@ -743,7 +812,7 @@ public class OpaAccessControl
     public void checkCanShowRoleAuthorizationDescriptors(SystemSecurityContext context)
     {
         if (!queryOpaWithSimpleAction(context, "ShowRoleAuthorizationDescriptors")) {
-            SystemAccessControl.super.checkCanShowRoleAuthorizationDescriptors(context);
+            denyShowRoleAuthorizationDescriptors();
         }
     }
 
@@ -751,7 +820,7 @@ public class OpaAccessControl
     public void checkCanShowCurrentRoles(SystemSecurityContext context)
     {
         if (!queryOpaWithSimpleAction(context, "ShowCurrentRoles")) {
-            SystemAccessControl.super.checkCanShowCurrentRoles(context);
+            denyShowCurrentRoles();
         }
     }
 
@@ -759,7 +828,7 @@ public class OpaAccessControl
     public void checkCanShowRoleGrants(SystemSecurityContext context)
     {
         if (!queryOpaWithSimpleAction(context, "ShowRoleGrants")) {
-            SystemAccessControl.super.checkCanShowRoleGrants(context);
+            denyShowRoleGrants();
         }
     }
 
@@ -768,7 +837,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().schema(new OpaQueryInputResource.CatalogSchema(procedure.getCatalogName(), procedure.getSchemaName())).function(procedure.getRoutineName()).build();
         if (!queryOpaWithSimpleResource(systemSecurityContext, "ExecuteProcedure", resource)) {
-            SystemAccessControl.super.checkCanExecuteProcedure(systemSecurityContext, procedure);
+            denyExecuteProcedure(procedure.toString());
         }
     }
 
@@ -778,7 +847,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().function(functionName).build();
 
         if (!queryOpaWithSimpleResource(systemSecurityContext, "ExecuteFunction", resource)) {
-            SystemAccessControl.super.checkCanExecuteFunction(systemSecurityContext, functionName);
+            denyExecuteFunction(functionName);
         }
     }
 
@@ -788,7 +857,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().schema(new OpaQueryInputResource.CatalogSchema(functionName.getCatalogName(), functionName.getSchemaName())).function(new OpaQueryInputResource.Function(functionName.getRoutineName(), functionKind)).build();
 
         if (!queryOpaWithSimpleResource(systemSecurityContext, "ExecuteFunction", resource)) {
-            SystemAccessControl.super.checkCanExecuteFunction(systemSecurityContext, functionKind, functionName);
+            denyExecuteFunction(functionName.toString());
         }
     }
 
@@ -796,8 +865,9 @@ public class OpaAccessControl
     public void checkCanExecuteTableProcedure(SystemSecurityContext systemSecurityContext, CatalogSchemaTableName table, String procedure)
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table)).function(procedure).build();
+
         if (!queryOpaWithSimpleResource(systemSecurityContext, "ExecuteTableProcedure", resource)) {
-            SystemAccessControl.super.checkCanExecuteTableProcedure(systemSecurityContext, table, procedure);
+            denyExecuteTableProcedure(table.toString(), procedure);
         }
     }
 
