@@ -22,7 +22,7 @@ import io.trino.spi.security.SystemAccessControl;
 import static io.airlift.configuration.ConditionalModule.conditionalModule;
 import static io.airlift.configuration.ConfigBinder.configBinder;
 
-public class OpaAuthorizerModule
+public class OpaAccessControlModule
         extends AbstractConfigurationAwareModule
 {
     @Override
@@ -32,7 +32,7 @@ public class OpaAuthorizerModule
         install(conditionalModule(
                 OpaConfig.class,
                 config -> config.getOpaBatchUri() != null,
-                new OpaBatchAuthorizerModule(),
+                new OpaBatchAccessControlModule(),
                 new OpaSingleAuthorizerModule()));
     }
 
@@ -42,17 +42,17 @@ public class OpaAuthorizerModule
         @Override
         protected void setup(Binder binder)
         {
-            binder.bind(Key.get(SystemAccessControl.class, ForOpa.class)).to(OpaAuthorizer.class).in(Scopes.SINGLETON);
+            binder.bind(Key.get(SystemAccessControl.class, ForOpa.class)).to(OpaAccessControl.class).in(Scopes.SINGLETON);
         }
     }
 
-    public static class OpaBatchAuthorizerModule
+    public static class OpaBatchAccessControlModule
             extends AbstractConfigurationAwareModule
     {
         @Override
         protected void setup(Binder binder)
         {
-            binder.bind(Key.get(SystemAccessControl.class, ForOpa.class)).to(OpaBatchAuthorizer.class).in(Scopes.SINGLETON);
+            binder.bind(Key.get(SystemAccessControl.class, ForOpa.class)).to(OpaBatchAccessControl.class).in(Scopes.SINGLETON);
         }
     }
 }

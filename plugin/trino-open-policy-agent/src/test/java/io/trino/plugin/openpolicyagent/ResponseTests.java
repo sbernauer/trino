@@ -46,11 +46,11 @@ public class ResponseTests
     public void testCanDeserializeOpaSingleResponse(boolean response)
             throws IOException
     {
-        OpaAuthorizer.OpaQueryResult result = this.json.readValue("""
+        OpaAccessControl.OpaQueryResult result = this.json.readValue("""
                 {
                     "decision_id": "foo",
                     "result": %s
-                }""".formatted(String.valueOf(response)), OpaAuthorizer.OpaQueryResult.class);
+                }""".formatted(String.valueOf(response)), OpaAccessControl.OpaQueryResult.class);
         assertEquals(response, result.result);
         assertEquals("foo", result.decisionId);
     }
@@ -60,10 +60,10 @@ public class ResponseTests
     public void testCanDeserializeOpaSingleResponseWithNoDecisionId(boolean response)
             throws IOException
     {
-        OpaAuthorizer.OpaQueryResult result = this.json.readValue("""
+        OpaAccessControl.OpaQueryResult result = this.json.readValue("""
                 {
                     "result": %s
-                }""".formatted(String.valueOf(response)), OpaAuthorizer.OpaQueryResult.class);
+                }""".formatted(String.valueOf(response)), OpaAccessControl.OpaQueryResult.class);
         assertEquals(response, result.result);
         assertNull(result.decisionId);
     }
@@ -72,9 +72,9 @@ public class ResponseTests
     public void testUndefinedDecisionSingleResponse()
             throws IOException
     {
-        OpaAuthorizer.OpaQueryResult result = this.json.readValue(
+        OpaAccessControl.OpaQueryResult result = this.json.readValue(
                 "{}",
-                OpaAuthorizer.OpaQueryResult.class);
+                OpaAccessControl.OpaQueryResult.class);
         assertNull(result.result);
         assertNull(result.decisionId);
     }
@@ -83,9 +83,9 @@ public class ResponseTests
     public void testUndefinedDecisionBatchResponse()
             throws IOException
     {
-        OpaBatchAuthorizer.OpaBatchQueryResult result = this.json.readValue(
+        OpaBatchAccessControl.OpaBatchQueryResult result = this.json.readValue(
                 "{}",
-                OpaBatchAuthorizer.OpaBatchQueryResult.class);
+                OpaBatchAccessControl.OpaBatchQueryResult.class);
         assertNull(result.result);
         assertNull(result.decisionId);
     }
@@ -94,10 +94,10 @@ public class ResponseTests
     public void testBatchResponseEmptyNoDecisionId()
             throws IOException
     {
-        OpaBatchAuthorizer.OpaBatchQueryResult result = this.json.readValue("""
+        OpaBatchAccessControl.OpaBatchQueryResult result = this.json.readValue("""
                 {
                     "result": []
-                }""", OpaBatchAuthorizer.OpaBatchQueryResult.class);
+                }""", OpaBatchAccessControl.OpaBatchQueryResult.class);
         assertEquals(List.of(), result.result);
         assertNull(result.decisionId);
     }
@@ -106,10 +106,10 @@ public class ResponseTests
     public void testBatchResponseWithItemsNoDecisionId()
             throws IOException
     {
-        OpaBatchAuthorizer.OpaBatchQueryResult result = this.json.readValue("""
+        OpaBatchAccessControl.OpaBatchQueryResult result = this.json.readValue("""
                 {
                     "result": [1, 2, 3]
-                }""", OpaBatchAuthorizer.OpaBatchQueryResult.class);
+                }""", OpaBatchAccessControl.OpaBatchQueryResult.class);
         assertEquals(List.of(1, 2, 3), result.result);
         assertNull(result.decisionId);
     }
@@ -118,11 +118,11 @@ public class ResponseTests
     public void testBatchResponseWithItemsAndDecisionId()
             throws IOException
     {
-        OpaBatchAuthorizer.OpaBatchQueryResult result = this.json.readValue("""
+        OpaBatchAccessControl.OpaBatchQueryResult result = this.json.readValue("""
                 {
                     "result": [1, 2, 3],
                     "decision_id": "foobar"
-                }""", OpaBatchAuthorizer.OpaBatchQueryResult.class);
+                }""", OpaBatchAccessControl.OpaBatchQueryResult.class);
         assertEquals(List.of(1, 2, 3), result.result);
         assertEquals("foobar", result.decisionId);
     }

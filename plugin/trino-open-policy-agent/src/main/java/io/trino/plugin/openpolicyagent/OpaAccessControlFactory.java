@@ -23,7 +23,7 @@ import java.util.Map;
 
 import static java.util.Objects.requireNonNull;
 
-public class OpaAuthorizerFactory
+public class OpaAccessControlFactory
         implements SystemAccessControlFactory
 {
     @Override
@@ -37,7 +37,7 @@ public class OpaAuthorizerFactory
     {
         requireNonNull(config, "config is null");
 
-        Bootstrap app = new Bootstrap(new OpaAuthorizerModule());
+        Bootstrap app = new Bootstrap(new OpaAccessControlModule());
 
         Injector injector = app.doNotInitializeLogging().setRequiredConfigurationProperties(config).initialize();
         return injector.getInstance(Key.get(SystemAccessControl.class, ForOpa.class));

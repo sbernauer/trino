@@ -28,27 +28,27 @@ public class TestFactory
     @Test
     public void testCreatesSimpleAuthorizerIfNoBatchUriProvided()
     {
-        OpaAuthorizerFactory factory = new OpaAuthorizerFactory();
+        OpaAccessControlFactory factory = new OpaAccessControlFactory();
         SystemAccessControl opaAuthorizer = factory.create(Map.of("opa.policy.uri", "foo"));
 
-        assertInstanceOf(OpaAuthorizer.class, opaAuthorizer);
-        assertFalse(opaAuthorizer instanceof OpaBatchAuthorizer);
+        assertInstanceOf(OpaAccessControl.class, opaAuthorizer);
+        assertFalse(opaAuthorizer instanceof OpaBatchAccessControl);
     }
 
     @Test
     public void testCreatesBatchAuthorizerIfBatchUriProvided()
     {
-        OpaAuthorizerFactory factory = new OpaAuthorizerFactory();
+        OpaAccessControlFactory factory = new OpaAccessControlFactory();
         SystemAccessControl opaAuthorizer = factory.create(Map.of("opa.policy.uri", "foo", "opa.policy.batched-uri", "bar"));
 
-        assertInstanceOf(OpaBatchAuthorizer.class, opaAuthorizer);
-        assertInstanceOf(OpaAuthorizer.class, opaAuthorizer);
+        assertInstanceOf(OpaBatchAccessControl.class, opaAuthorizer);
+        assertInstanceOf(OpaAccessControl.class, opaAuthorizer);
     }
 
     @Test
     public void testBasePolicyUriCannotBeUnset()
     {
-        OpaAuthorizerFactory factory = new OpaAuthorizerFactory();
+        OpaAccessControlFactory factory = new OpaAccessControlFactory();
 
         assertThrows(
                 ApplicationConfigurationException.class,

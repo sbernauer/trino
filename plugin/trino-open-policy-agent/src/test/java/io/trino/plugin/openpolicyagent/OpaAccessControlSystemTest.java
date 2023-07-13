@@ -46,7 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class OpaAuthorizerSystemTest
+public class OpaAccessControlSystemTest
 {
     private static URI opaServerUri;
     private static Process opaServer;
@@ -169,7 +169,7 @@ public class OpaAuthorizerSystemTest
             Session session = Session.builder(sessionPropertyManager)
                     .setQueryId(idGen.createNextQueryId()).setIdentity(identity).build();
             trinoServer = TestingTrinoServer.builder()
-                    .setSystemAccessControls(Collections.singletonList(new OpaAuthorizer(new OpaConfig().setOpaUri(opaServerUri.resolve("v1/data/trino/allow")))))
+                    .setSystemAccessControls(Collections.singletonList(new OpaAccessControl(new OpaConfig().setOpaUri(opaServerUri.resolve("v1/data/trino/allow")))))
                     .build();
             trinoClient = new TestingTrinoClient(trinoServer, session);
         }
@@ -242,7 +242,7 @@ public class OpaAuthorizerSystemTest
             Session session = Session.builder(sessionPropertyManager)
                     .setQueryId(idGen.createNextQueryId()).setIdentity(identity).build();
             trinoServer = TestingTrinoServer.builder()
-                    .setSystemAccessControls(Collections.singletonList(new OpaBatchAuthorizer(new OpaConfig().setOpaUri(opaServerUri.resolve("v1/data/trino/allow")).setOpaBatchUri(opaServerUri.resolve("v1/data/trino/extended")))))
+                    .setSystemAccessControls(Collections.singletonList(new OpaBatchAccessControl(new OpaConfig().setOpaUri(opaServerUri.resolve("v1/data/trino/allow")).setOpaBatchUri(opaServerUri.resolve("v1/data/trino/extended")))))
                     .build();
             trinoClient = new TestingTrinoClient(trinoServer, session);
         }

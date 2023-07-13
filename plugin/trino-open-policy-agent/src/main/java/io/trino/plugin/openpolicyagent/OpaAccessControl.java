@@ -43,7 +43,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-public class OpaAuthorizer
+public class OpaAccessControl
         implements SystemAccessControl
 {
     private final HttpClient httpClient;
@@ -51,12 +51,12 @@ public class OpaAuthorizer
     private final URI opaPolicyUri;
 
     @Inject
-    public OpaAuthorizer(OpaConfig config)
+    public OpaAccessControl(OpaConfig config)
     {
         this(config, HttpClient.newHttpClient());
     }
 
-    public OpaAuthorizer(OpaConfig config, HttpClient httpClient)
+    public OpaAccessControl(OpaConfig config, HttpClient httpClient)
     {
         this.opaPolicyUri = config.getOpaUri();
         this.json = new ObjectMapper();

@@ -18,12 +18,12 @@ import io.trino.spi.security.SystemAccessControlFactory;
 
 import java.util.Collections;
 
-public class OpaAuthorizerPlugin
+public class OpaAccessControlPlugin
         implements Plugin
 {
     @Override
     public Iterable<SystemAccessControlFactory> getSystemAccessControlFactories()
     {
-        return Collections.singleton(new OpaAuthorizerFactory());
+        return Collections.singleton(new OpaAccessControlFactory());
     }
 }

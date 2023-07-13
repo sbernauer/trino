@@ -44,11 +44,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-public class OpaAuthorizerFilteringUnitTest
+public class OpaAccessControlFilteringUnitTest
 {
     private static URI opaServerUri = URI.create("http://my-uri/");
     private HttpClientUtils.InstrumentedHttpClient mockClient;
-    private OpaAuthorizer authorizer;
+    private OpaAccessControl authorizer;
     private JsonMapper jsonMapper = new JsonMapper();
     private Identity requestingIdentity;
     private SystemSecurityContext requestingSecurityContext;
@@ -58,7 +58,7 @@ public class OpaAuthorizerFilteringUnitTest
             throws InterruptedException, IOException
     {
         this.mockClient = new HttpClientUtils.InstrumentedHttpClient();
-        this.authorizer = new OpaAuthorizer(new OpaConfig().setOpaUri(opaServerUri), this.mockClient.getHttpClient());
+        this.authorizer = new OpaAccessControl(new OpaConfig().setOpaUri(opaServerUri), this.mockClient.getHttpClient());
         this.requestingIdentity = Identity.ofUser("source-user");
         this.requestingSecurityContext = new SystemSecurityContext(requestingIdentity, Optional.empty());
         this.mockClient.setHandler((request) -> OK_RESPONSE);
@@ -265,7 +265,7 @@ public class OpaAuthorizerFilteringUnitTest
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.FilteringTestHelpers#emptyInputTestCases")
     public void testEmptyRequests(
-            BiFunction<OpaAuthorizer, SystemSecurityContext, Collection> callable)
+            BiFunction<OpaAccessControl, SystemSecurityContext, Collection> callable)
     {
         Collection result = callable.apply(authorizer, requestingSecurityContext);
         assertEquals(result.size(), 0);
@@ -275,7 +275,7 @@ public class OpaAuthorizerFilteringUnitTest
     @ParameterizedTest(name = "{index}: {0} - {1}")
     @MethodSource("io.trino.plugin.openpolicyagent.FilteringTestHelpers#prepopulatedErrorCases")
     public void testIllegalResponseThrows(
-            BiFunction<OpaAuthorizer, SystemSecurityContext, Collection> callable,
+            BiFunction<OpaAccessControl, SystemSecurityContext, Collection> callable,
             HttpResponse<String> failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)

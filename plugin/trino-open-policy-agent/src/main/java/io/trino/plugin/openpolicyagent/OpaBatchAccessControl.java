@@ -29,8 +29,8 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class OpaBatchAuthorizer
-        extends OpaAuthorizer
+public class OpaBatchAccessControl
+        extends OpaAccessControl
 {
     private final URI opaBatchedPolicyUri;
 
@@ -42,13 +42,13 @@ public class OpaBatchAuthorizer
     }
 
     @Inject
-    public OpaBatchAuthorizer(OpaConfig config)
+    public OpaBatchAccessControl(OpaConfig config)
     {
         super(config);
         this.opaBatchedPolicyUri = config.getOpaBatchUri();
     }
 
-    public OpaBatchAuthorizer(OpaConfig config, HttpClient httpClient)
+    public OpaBatchAccessControl(OpaConfig config, HttpClient httpClient)
     {
         super(config, httpClient);
         this.opaBatchedPolicyUri = config.getOpaBatchUri();

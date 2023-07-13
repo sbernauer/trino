@@ -48,12 +48,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class OpaBatchAuthorizerFilteringUnitTest
+public class OpaBatchAccessControlFilteringUnitTest
 {
     private static URI opaServerUri = URI.create("http://my-uri/");
     private static URI opaExtendedServerUri = URI.create("http://my-uri/extended");
     private HttpClientUtils.InstrumentedHttpClient mockClient;
-    private OpaAuthorizer authorizer;
+    private OpaAccessControl authorizer;
     private JsonMapper jsonMapper = new JsonMapper();
     private Identity requestingIdentity;
     private SystemSecurityContext requestingSecurityContext;
@@ -65,7 +65,7 @@ public class OpaBatchAuthorizerFilteringUnitTest
         this.jsonMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
         this.jsonMapper.registerModule(new Jdk8Module());
         this.mockClient = new HttpClientUtils.InstrumentedHttpClient();
-        this.authorizer = new OpaBatchAuthorizer(new OpaConfig().setOpaUri(opaServerUri).setOpaBatchUri(opaExtendedServerUri), this.mockClient.getHttpClient());
+        this.authorizer = new OpaBatchAccessControl(new OpaConfig().setOpaUri(opaServerUri).setOpaBatchUri(opaExtendedServerUri), this.mockClient.getHttpClient());
         this.requestingIdentity = Identity.ofUser("source-user");
         this.requestingSecurityContext = new SystemSecurityContext(requestingIdentity, Optional.empty());
     }
@@ -107,7 +107,7 @@ public class OpaBatchAuthorizerFilteringUnitTest
     }
 
     @ParameterizedTest(name = "{index}: {0}")
-    @MethodSource("io.trino.plugin.openpolicyagent.OpaBatchAuthorizerFilteringUnitTest#subsetProvider")
+    @MethodSource("io.trino.plugin.openpolicyagent.OpaBatchAccessControlFilteringUnitTest#subsetProvider")
     public void testFilterViewQueryOwnedBy(
             HttpResponse<String> response,
             List<Integer> expectedItems)
@@ -136,7 +136,7 @@ public class OpaBatchAuthorizerFilteringUnitTest
     }
 
     @ParameterizedTest(name = "{index}: {0}")
-    @MethodSource("io.trino.plugin.openpolicyagent.OpaBatchAuthorizerFilteringUnitTest#subsetProvider")
+    @MethodSource("io.trino.plugin.openpolicyagent.OpaBatchAccessControlFilteringUnitTest#subsetProvider")
     public void testFilterCatalogs(
             HttpResponse<String> response,
             List<Integer> expectedItems)
@@ -175,7 +175,7 @@ public class OpaBatchAuthorizerFilteringUnitTest
     }
 
     @ParameterizedTest(name = "{index}: {0}")
-    @MethodSource("io.trino.plugin.openpolicyagent.OpaBatchAuthorizerFilteringUnitTest#subsetProvider")
+    @MethodSource("io.trino.plugin.openpolicyagent.OpaBatchAccessControlFilteringUnitTest#subsetProvider")
     public void testFilterSchemas(
             HttpResponse<String> response,
             List<Integer> expectedItems)
@@ -217,7 +217,7 @@ public class OpaBatchAuthorizerFilteringUnitTest
     }
 
     @ParameterizedTest(name = "{index}: {0}")
-    @MethodSource("io.trino.plugin.openpolicyagent.OpaBatchAuthorizerFilteringUnitTest#subsetProvider")
+    @MethodSource("io.trino.plugin.openpolicyagent.OpaBatchAccessControlFilteringUnitTest#subsetProvider")
     public void testFilterTables(
             HttpResponse<String> response,
             List<Integer> expectedItems)
@@ -265,7 +265,7 @@ public class OpaBatchAuthorizerFilteringUnitTest
     }
 
     @ParameterizedTest(name = "{index}: {0}")
-    @MethodSource("io.trino.plugin.openpolicyagent.OpaBatchAuthorizerFilteringUnitTest#subsetProvider")
+    @MethodSource("io.trino.plugin.openpolicyagent.OpaBatchAccessControlFilteringUnitTest#subsetProvider")
     public void testFilterColumns(
             HttpResponse<String> response,
             List<Integer> expectedItems)
@@ -300,7 +300,7 @@ public class OpaBatchAuthorizerFilteringUnitTest
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.FilteringTestHelpers#emptyInputTestCases")
     public void testEmptyRequests(
-            BiFunction<OpaAuthorizer, SystemSecurityContext, Collection> callable)
+            BiFunction<OpaAccessControl, SystemSecurityContext, Collection> callable)
     {
         Collection result = callable.apply(authorizer, requestingSecurityContext);
         assertEquals(result.size(), 0);
@@ -310,7 +310,7 @@ public class OpaBatchAuthorizerFilteringUnitTest
     @ParameterizedTest(name = "{index}: {0} - {1}")
     @MethodSource("io.trino.plugin.openpolicyagent.FilteringTestHelpers#prepopulatedErrorCases")
     public void testIllegalResponseThrows(
-            BiFunction<OpaAuthorizer, SystemSecurityContext, Collection> callable,
+            BiFunction<OpaAccessControl, SystemSecurityContext, Collection> callable,
             HttpResponse<String> failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
