@@ -59,9 +59,6 @@ public class OpaBatchAccessControl
         if (input.action.filterResources == null) {
             throw new OpaQueryException.OpaInternalPluginError("Cannot send a batch request without a collection of resources");
         }
-        if (opaBatchedPolicyUri == null) {
-            throw new OpaQueryException.OpaInternalPluginError("Attempted to send a batched request with an unconfigured batch URI");
-        }
         List<Integer> result = tryGetResponseFromOpa(input, opaBatchedPolicyUri, OpaBatchQueryResult.class).result;
         if (result == null) {
             return List.of();
