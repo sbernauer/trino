@@ -155,30 +155,29 @@ public class OpaAccessControlUnitTest
                 OpaAccessControl::checkCanDropView,
                 OpaAccessControl::checkCanRefreshMaterializedView,
                 OpaAccessControl::checkCanDropMaterializedView);
-        Stream<FunctionalHelpers.Pair<String, String>> actionAndResource = Stream.of(
-                FunctionalHelpers.Pair.of("ShowCreateTable", "table"),
-                FunctionalHelpers.Pair.of("DropTable", "table"),
-                FunctionalHelpers.Pair.of("SetTableComment", "table"),
-                FunctionalHelpers.Pair.of("SetColumnComment", "table"),
-                FunctionalHelpers.Pair.of("ShowColumns", "table"),
-                FunctionalHelpers.Pair.of("AddColumn", "table"),
-                FunctionalHelpers.Pair.of("DropColumn", "table"),
-                FunctionalHelpers.Pair.of("RenameColumn", "table"),
-                FunctionalHelpers.Pair.of("InsertIntoTable", "table"),
-                FunctionalHelpers.Pair.of("DeleteFromTable", "table"),
-                FunctionalHelpers.Pair.of("TruncateTable", "table"),
-                FunctionalHelpers.Pair.of("CreateView", "view"),
-                FunctionalHelpers.Pair.of("DropView", "view"),
-                FunctionalHelpers.Pair.of("RefreshMaterializedView", "view"),
-                FunctionalHelpers.Pair.of("DropMaterializedView", "view"));
-        return Streams.zip(actionAndResource, methods, (action, method) -> Arguments.of(Named.of(action.getFirst(), action.getFirst()), action.getSecond(), method));
+        Stream<String> actions = Stream.of(
+                "ShowCreateTable",
+                "DropTable",
+                "SetTableComment",
+                "SetColumnComment",
+                "ShowColumns",
+                "AddColumn",
+                "DropColumn",
+                "RenameColumn",
+                "InsertIntoTable",
+                "DeleteFromTable",
+                "TruncateTable",
+                "CreateView",
+                "DropView",
+                "RefreshMaterializedView",
+                "DropMaterializedView");
+        return Streams.zip(actions, methods, (action, method) -> Arguments.of(Named.of(action, action), method));
     }
 
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.OpaAccessControlUnitTest#tableResourceTestCases")
     public void testTableResourceActions(
             String actionName,
-            String resourceName,
             FunctionalHelpers.Consumer3<OpaAccessControl, SystemSecurityContext, CatalogSchemaTableName> callable)
     {
         callable.accept(authorizer, requestingSecurityContext, new CatalogSchemaTableName("my-catalog", "my-schema", "my-table"));
@@ -187,14 +186,14 @@ public class OpaAccessControlUnitTest
                 {
                     "operation": "%s",
                     "resource": {
-                        "%s": {
+                        "table": {
                             "catalogName": "my-catalog",
                             "schemaName": "my-schema",
                             "tableName": "my-table"
                         }
                     }
                 }
-                """.formatted(actionName, resourceName);
+                """.formatted(actionName);
         assertStringRequestsEqual(Set.of(expectedRequest), mockClient.getRequests(), "/input/action");
     }
 
@@ -207,7 +206,6 @@ public class OpaAccessControlUnitTest
     @MethodSource("io.trino.plugin.openpolicyagent.OpaAccessControlUnitTest#tableResourceFailureTestCases")
     public void testTableResourceFailure(
             String actionName,
-            String resourceName,
             FunctionalHelpers.Consumer3<OpaAccessControl, SystemSecurityContext, CatalogSchemaTableName> method,
             HttpResponse<String> failureResponse,
             Class<? extends Throwable> expectedException,
@@ -227,19 +225,18 @@ public class OpaAccessControlUnitTest
                 OpaAccessControl::checkCanSetMaterializedViewProperties,
                 OpaAccessControl::checkCanCreateTable,
                 OpaAccessControl::checkCanCreateMaterializedView);
-        Stream<FunctionalHelpers.Pair<String, String>> actionAndResource = Stream.of(
-                FunctionalHelpers.Pair.of("SetTableProperties", "table"),
-                FunctionalHelpers.Pair.of("SetMaterializedViewProperties", "view"),
-                FunctionalHelpers.Pair.of("CreateTable", "table"),
-                FunctionalHelpers.Pair.of("CreateMaterializedView", "view"));
-        return Streams.zip(actionAndResource, methods, (action, method) -> Arguments.of(Named.of(action.getFirst(), action.getFirst()), action.getSecond(), method));
+        Stream<String> actions = Stream.of(
+                "SetTableProperties",
+                "SetMaterializedViewProperties",
+                "CreateTable",
+                "CreateMaterializedView");
+        return Streams.zip(actions, methods, (action, method) -> Arguments.of(Named.of(action, action), method));
     }
 
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.OpaAccessControlUnitTest#tableWithPropertiesTestCases")
     public void testTableWithPropertiesActions(
             String actionName,
-            String resourceName,
             FunctionalHelpers.Consumer4<OpaAccessControl, SystemSecurityContext, CatalogSchemaTableName, Map> callable)
     {
         CatalogSchemaTableName table = new CatalogSchemaTableName("my-catalog", "my-schema", "my-table");
@@ -254,7 +251,7 @@ public class OpaAccessControlUnitTest
                 {
                     "operation": "%s",
                     "resource": {
-                        "%s": {
+                        "table": {
                             "tableName": "my-table",
                             "catalogName": "my-catalog",
                             "schemaName": "my-schema",
@@ -266,7 +263,7 @@ public class OpaAccessControlUnitTest
                         }
                     }
                 }
-                """.formatted(actionName, resourceName);
+                """.formatted(actionName);
         assertStringRequestsEqual(Set.of(expectedRequest), mockClient.getRequests(), "/input/action");
     }
 
@@ -279,7 +276,6 @@ public class OpaAccessControlUnitTest
     @MethodSource("io.trino.plugin.openpolicyagent.OpaAccessControlUnitTest#tableWithPropertiesFailureTestCases")
     public void testTableWithPropertiesActionFailure(
             String actionName,
-            String resourceName,
             FunctionalHelpers.Consumer4<OpaAccessControl, SystemSecurityContext, CatalogSchemaTableName, Map> method,
             HttpResponse<String> failureResponse,
             Class<? extends Throwable> expectedException,
@@ -572,18 +568,17 @@ public class OpaAccessControlUnitTest
                 OpaAccessControl::checkCanRenameTable,
                 OpaAccessControl::checkCanRenameView,
                 OpaAccessControl::checkCanRenameMaterializedView);
-        Stream<FunctionalHelpers.Pair<String, String>> actionAndResource = Stream.of(
-                FunctionalHelpers.Pair.of("RenameTable", "table"),
-                FunctionalHelpers.Pair.of("RenameView", "view"),
-                FunctionalHelpers.Pair.of("RenameMaterializedView", "view"));
-        return Streams.zip(actionAndResource, methods, (action, method) -> Arguments.of(Named.of(action.getFirst(), action.getFirst()), action.getSecond(), method));
+        Stream<String> actions = Stream.of(
+                "RenameTable",
+                "RenameView",
+                "RenameMaterializedView");
+        return Streams.zip(actions, methods, (action, method) -> Arguments.of(Named.of(action, action), method));
     }
 
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.OpaAccessControlUnitTest#renameTableTestCases")
     public void testRenameTableActions(
             String actionName,
-            String resourceName,
             FunctionalHelpers.Consumer4<OpaAccessControl, SystemSecurityContext, CatalogSchemaTableName, CatalogSchemaTableName> method)
     {
         CatalogSchemaTableName sourceTable = new CatalogSchemaTableName("some-catalog", "some-schema", "some-table");
@@ -595,21 +590,21 @@ public class OpaAccessControlUnitTest
                 {
                     "operation": "%s",
                     "resource": {
-                        "%s": {
+                        "table": {
                             "catalogName": "some-catalog",
                             "schemaName": "some-schema",
                             "tableName": "some-table"
                         }
                     },
                     "targetResource": {
-                        "%s": {
+                        "table": {
                             "catalogName": "another-catalog",
                             "schemaName": "another-schema",
                             "tableName": "another-table"
                         }
                     }
                 }
-                """.formatted(actionName, resourceName, resourceName);
+                """.formatted(actionName);
         assertStringRequestsEqual(Set.of(expectedRequest), mockClient.getRequests(), "/input/action");
     }
 
@@ -622,7 +617,6 @@ public class OpaAccessControlUnitTest
     @MethodSource("io.trino.plugin.openpolicyagent.OpaAccessControlUnitTest#renameTableFailureTestCases")
     public void testRenameTableFailure(
             String actionName,
-            String resourceName,
             FunctionalHelpers.Consumer4<OpaAccessControl, SystemSecurityContext, CatalogSchemaTableName, CatalogSchemaTableName> method,
             HttpResponse<String> failureResponse,
             Class<? extends Throwable> expectedException,
@@ -686,17 +680,16 @@ public class OpaAccessControlUnitTest
         Stream<FunctionalHelpers.Consumer4<OpaAccessControl, SystemSecurityContext, CatalogSchemaTableName, TrinoPrincipal>> methods = Stream.of(
                 OpaAccessControl::checkCanSetTableAuthorization,
                 OpaAccessControl::checkCanSetViewAuthorization);
-        Stream<FunctionalHelpers.Pair<String, String>> actionAndResource = Stream.of(
-                FunctionalHelpers.Pair.of("SetTableAuthorization", "table"),
-                FunctionalHelpers.Pair.of("SetViewAuthorization", "view"));
-        return Streams.zip(actionAndResource, methods, (action, method) -> Arguments.of(Named.of(action.getFirst(), action.getFirst()), action.getSecond(), method));
+        Stream<String> actions = Stream.of(
+                "SetTableAuthorization",
+                "SetViewAuthorization");
+        return Streams.zip(actions, methods, (action, method) -> Arguments.of(Named.of(action, action), method));
     }
 
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.OpaAccessControlUnitTest#setTableAuthorizationTestCases")
     public void testCanSetTableAuthorization(
             String actionName,
-            String resourceName,
             FunctionalHelpers.Consumer4<OpaAccessControl, SystemSecurityContext, CatalogSchemaTableName, TrinoPrincipal> method)
     {
         CatalogSchemaTableName table = new CatalogSchemaTableName("some-catalog", "some-schema", "some-table");
@@ -707,7 +700,7 @@ public class OpaAccessControlUnitTest
                 {
                     "operation": "%s",
                     "resource": {
-                        "%s": {
+                        "table": {
                             "catalogName": "some-catalog",
                             "schemaName": "some-schema",
                             "tableName": "some-table"
@@ -722,7 +715,7 @@ public class OpaAccessControlUnitTest
                         ]
                     }
                 }
-                """.formatted(actionName, resourceName);
+                """.formatted(actionName);
         assertStringRequestsEqual(Set.of(expectedRequest), mockClient.getRequests(), "/input/action");
     }
 
@@ -735,7 +728,6 @@ public class OpaAccessControlUnitTest
     @MethodSource("io.trino.plugin.openpolicyagent.OpaAccessControlUnitTest#setTableAuthorizationFailureTestCases")
     public void testCanSetTableAuthorizationFailure(
             String actionName,
-            String resourceName,
             FunctionalHelpers.Consumer4<OpaAccessControl, SystemSecurityContext, CatalogSchemaTableName, TrinoPrincipal> method,
             HttpResponse<String> failureResponse,
             Class<? extends Throwable> expectedException,

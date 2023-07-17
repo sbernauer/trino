@@ -34,7 +34,6 @@ public class OpaQueryInputResource
     public NamedEntity catalog;
     public CatalogSchema schema;
     public Table table;
-    public Table view;
     public NamedEntity role;
     public Set<NamedEntity> roles;
 
@@ -156,7 +155,6 @@ public class OpaQueryInputResource
         this.catalog = builder.catalog;
         this.schema = builder.schema;
         this.table = builder.table;
-        this.view = builder.view;
         this.role = builder.role;
         this.catalogSessionProperty = builder.catalogSessionProperty;
         this.function = builder.function;
@@ -171,7 +169,6 @@ public class OpaQueryInputResource
         private NamedEntity catalog;
         private CatalogSchema schema;
         private Table table;
-        private Table view;
         private NamedEntity role;
         private Set<NamedEntity> roles;
         private Function function;
@@ -209,12 +206,6 @@ public class OpaQueryInputResource
         public Builder table(Table table)
         {
             this.table = table;
-            return this;
-        }
-
-        public Builder view(Table view)
-        {
-            this.view = view;
             return this;
         }
 

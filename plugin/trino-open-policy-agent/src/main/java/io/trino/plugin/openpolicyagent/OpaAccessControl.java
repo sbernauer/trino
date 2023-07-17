@@ -595,7 +595,7 @@ public class OpaAccessControl
     @Override
     public void checkCanCreateView(SystemSecurityContext context, CatalogSchemaTableName view)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().view(new OpaQueryInputResource.Table(view)).build();
+        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(view)).build();
         if (!queryOpaWithSimpleResource(context, "CreateView", resource)) {
             denyCreateView(view.toString());
         }
@@ -604,8 +604,8 @@ public class OpaAccessControl
     @Override
     public void checkCanRenameView(SystemSecurityContext context, CatalogSchemaTableName view, CatalogSchemaTableName newView)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().view(new OpaQueryInputResource.Table(view)).build();
-        OpaQueryInputResource targetResource = new OpaQueryInputResource.Builder().view(new OpaQueryInputResource.Table(newView)).build();
+        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(view)).build();
+        OpaQueryInputResource targetResource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(newView)).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("RenameView").resource(resource).targetResource(targetResource).build();
         OpaQueryInput input = new OpaQueryInput(context, action);
 
@@ -617,7 +617,7 @@ public class OpaAccessControl
     @Override
     public void checkCanSetViewAuthorization(SystemSecurityContext context, CatalogSchemaTableName view, TrinoPrincipal principal)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().view(new OpaQueryInputResource.Table(view)).build();
+        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(view)).build();
         OpaQueryInputGrant grantee = new OpaQueryInputGrant.Builder().principal(principal).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("SetViewAuthorization").resource(resource).grantee(grantee).build();
         OpaQueryInput input = new OpaQueryInput(context, action);
@@ -630,7 +630,7 @@ public class OpaAccessControl
     @Override
     public void checkCanDropView(SystemSecurityContext context, CatalogSchemaTableName view)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().view(new OpaQueryInputResource.Table(view)).build();
+        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(view)).build();
         if (!queryOpaWithSimpleResource(context, "DropView", resource)) {
             denyDropView(view.toString());
         }
@@ -649,7 +649,7 @@ public class OpaAccessControl
     @Override
     public void checkCanCreateMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView, Map<String, Object> properties)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().view(new OpaQueryInputResource.Table(materializedView, properties)).build();
+        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(materializedView, properties)).build();
         if (!queryOpaWithSimpleResource(context, "CreateMaterializedView", resource)) {
             denyCreateMaterializedView(materializedView.toString());
         }
@@ -658,7 +658,7 @@ public class OpaAccessControl
     @Override
     public void checkCanRefreshMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().view(new OpaQueryInputResource.Table(materializedView)).build();
+        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(materializedView)).build();
         if (!queryOpaWithSimpleResource(context, "RefreshMaterializedView", resource)) {
             denyRefreshMaterializedView(materializedView.toString());
         }
@@ -672,7 +672,7 @@ public class OpaAccessControl
             transformedProperties.put(entry.getKey(), entry.getValue().orElse(null));
         }
 
-        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().view(new OpaQueryInputResource.Table(materializedView, transformedProperties)).build();
+        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(materializedView, transformedProperties)).build();
         if (!queryOpaWithSimpleResource(context, "SetMaterializedViewProperties", resource)) {
             denySetMaterializedViewProperties(materializedView.toString());
         }
@@ -681,7 +681,7 @@ public class OpaAccessControl
     @Override
     public void checkCanDropMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().view(new OpaQueryInputResource.Table(materializedView)).build();
+        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(materializedView)).build();
         if (!queryOpaWithSimpleResource(context, "DropMaterializedView", resource)) {
             denyDropMaterializedView(materializedView.toString());
         }
@@ -690,8 +690,8 @@ public class OpaAccessControl
     @Override
     public void checkCanRenameMaterializedView(SystemSecurityContext context, CatalogSchemaTableName view, CatalogSchemaTableName newView)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().view(new OpaQueryInputResource.Table(view)).build();
-        OpaQueryInputResource targetResource = new OpaQueryInputResource.Builder().view(new OpaQueryInputResource.Table(newView)).build();
+        OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(view)).build();
+        OpaQueryInputResource targetResource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(newView)).build();
 
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("RenameMaterializedView").resource(resource).targetResource(targetResource).build();
         OpaQueryInput input = new OpaQueryInput(context, action);
