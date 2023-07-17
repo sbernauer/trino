@@ -77,20 +77,15 @@ public class OpaAccessControlSystemTest
             throws IOException, InterruptedException
     {
         for (int i = 0; i < attempts; ++i) {
-            Socket socket = new Socket();
-            try {
+            try (Socket socket = new Socket()) {
                 socket.connect(addr, timeoutMs);
                 return;
             }
             catch (SocketTimeoutException e) {
-                // e.printStackTrace();
+                // ignored
             }
             catch (IOException e) {
-                // e.printStackTrace();
                 Thread.sleep(timeoutMs);
-            }
-            finally {
-                socket.close();
             }
         }
         throw new SocketTimeoutException("Timed out waiting for addr " + addr + " to be available ("
@@ -102,11 +97,16 @@ public class OpaAccessControlSystemTest
             throws IOException, InterruptedException
     {
         InetSocketAddress opaSocket = findAvailableTcpPort();
-        opaServer = new ProcessBuilder(System.getenv().getOrDefault("OPA_BINARY", "opa"), "run", "--server", "--addr",
-                opaSocket.getHostString() + ":" + opaSocket.getPort()).inheritIO().start();
+        String opaEndpoint = String.format("%s:%d", opaSocket.getHostString(), opaSocket.getPort());
+        System.out.println("OPA has endpoint " + opaEndpoint);
+        opaServer = new ProcessBuilder(System.getenv().getOrDefault("OPA_BINARY", "opa"),
+                "run",
+                "--server",
+                "--addr", opaEndpoint,
+                "--set", "decision_logs.console=true"
+        ).inheritIO().start();
         awaitSocketOpen(opaSocket, 100, 200);
-        opaServerUri =
-                URI.create("http://" + opaSocket.getHostString() + ":" + opaSocket.getPort() + "/");
+        opaServerUri = URI.create(String.format("http://%s/", opaEndpoint));
     }
 
     @AfterAll
