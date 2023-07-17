@@ -73,7 +73,10 @@ public class OpaBatchAccessControl
                 .filterResources(converter.apply(orderedItems.stream()))
                 .build();
         OpaQueryInput query = new OpaQueryInput(context, action);
-        return batchQueryOpa(query).stream().map(orderedItems::get).collect(Collectors.toSet());
+        return batchQueryOpa(query)
+                .stream()
+                .map(orderedItems::get)
+                .collect(Collectors.toSet());
     }
 
     private <T> Function<Stream<T>, List<OpaQueryInputResource>> mapItemToResource(Function<T, OpaQueryInputResource> converter)
@@ -88,25 +91,52 @@ public class OpaBatchAccessControl
                 context,
                 "FilterViewQueryOwnedBy",
                 queryOwners,
-                mapItemToResource((item) -> new OpaQueryInputResource.Builder().user(new OpaQueryInputResource.User(item)).build()));
+                mapItemToResource((item) -> new OpaQueryInputResource
+                        .Builder()
+                        .user(new OpaQueryInputResource.User(item))
+                        .build()));
     }
 
     @Override
     public Set<String> filterCatalogs(SystemSecurityContext context, Set<String> catalogs)
     {
-        return filterFromOpa(context, "FilterCatalogs", catalogs, mapItemToResource((i) -> new OpaQueryInputResource.Builder().catalog(i).build()));
+        return filterFromOpa(
+                context,
+                "FilterCatalogs",
+                catalogs,
+                mapItemToResource(
+                        (i) -> new OpaQueryInputResource
+                                .Builder()
+                                .catalog(i)
+                                .build()));
     }
 
     @Override
     public Set<String> filterSchemas(SystemSecurityContext context, String catalogName, Set<String> schemaNames)
     {
-        return filterFromOpa(context, "FilterSchemas", schemaNames, mapItemToResource((i) -> new OpaQueryInputResource.Builder().schema(new OpaQueryInputResource.CatalogSchema(catalogName, i)).build()));
+        return filterFromOpa(
+                context,
+                "FilterSchemas",
+                schemaNames,
+                mapItemToResource(
+                        (i) -> new OpaQueryInputResource
+                                .Builder()
+                                .schema(new OpaQueryInputResource.CatalogSchema(catalogName, i))
+                                .build()));
     }
 
     @Override
     public Set<SchemaTableName> filterTables(SystemSecurityContext context, String catalogName, Set<SchemaTableName> tableNames)
     {
-        return filterFromOpa(context, "FilterTables", tableNames, mapItemToResource((i) -> new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(catalogName, i.getSchemaName(), i.getTableName())).build()));
+        return filterFromOpa(
+                context,
+                "FilterTables",
+                tableNames,
+                mapItemToResource(
+                        (i) -> new OpaQueryInputResource
+                                .Builder()
+                                .table(new OpaQueryInputResource.Table(catalogName, i.getSchemaName(), i.getTableName()))
+                                .build()));
     }
 
     @Override
@@ -116,6 +146,9 @@ public class OpaBatchAccessControl
                 context,
                 "FilterColumns",
                 columns,
-                (s) -> List.of(new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table, s.collect(Collectors.toSet()))).build()));
+                (s) -> List.of(new OpaQueryInputResource
+                        .Builder()
+                        .table(new OpaQueryInputResource.Table(table, s.collect(Collectors.toSet())))
+                        .build()));
     }
 }

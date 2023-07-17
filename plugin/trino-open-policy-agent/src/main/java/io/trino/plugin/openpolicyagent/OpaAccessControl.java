@@ -144,7 +144,13 @@ public class OpaAccessControl
         }
         HttpResponse<String> response;
         try {
-            response = httpClient.send(HttpRequest.newBuilder(uri).header("Content-Type", "application/json").POST(HttpRequest.BodyPublishers.ofByteArray(queryJson)).build(), HttpResponse.BodyHandlers.ofString());
+            response = httpClient.send(
+                    HttpRequest
+                            .newBuilder(uri)
+                            .header("Content-Type", "application/json")
+                            .POST(HttpRequest.BodyPublishers.ofByteArray(queryJson))
+                            .build(),
+                    HttpResponse.BodyHandlers.ofString());
         }
         catch (Exception e) {
             throw new OpaQueryException.QueryFailed(e);
@@ -230,7 +236,16 @@ public class OpaAccessControl
     @Override
     public Collection<Identity> filterViewQueryOwnedBy(SystemSecurityContext context, Collection<Identity> queryOwners)
     {
-        return queryOwners.parallelStream().filter(queryOwner -> queryOpaWithSimpleResource(context, "FilterViewQueryOwnedBy", new OpaQueryInputResource.Builder().user(new OpaQueryInputResource.User(queryOwner)).build())).collect(Collectors.toSet());
+        return queryOwners
+                .parallelStream()
+                .filter(queryOwner -> queryOpaWithSimpleResource(
+                        context,
+                        "FilterViewQueryOwnedBy",
+                        new OpaQueryInputResource
+                                .Builder()
+                                .user(new OpaQueryInputResource.User(queryOwner))
+                                .build()))
+                .collect(Collectors.toSet());
     }
 
     @Override
@@ -281,7 +296,16 @@ public class OpaAccessControl
     @Override
     public Set<String> filterCatalogs(SystemSecurityContext context, Set<String> catalogs)
     {
-        return catalogs.parallelStream().filter(catalog -> queryOpaWithSimpleResource(context, "FilterCatalogs", new OpaQueryInputResource.Builder().catalog(catalog).build())).collect(Collectors.toSet());
+        return catalogs
+                .parallelStream()
+                .filter(catalog -> queryOpaWithSimpleResource(
+                        context,
+                        "FilterCatalogs",
+                        new OpaQueryInputResource
+                                .Builder()
+                                .catalog(catalog)
+                                .build()))
+                .collect(Collectors.toSet());
     }
 
     @Override
@@ -340,7 +364,16 @@ public class OpaAccessControl
     @Override
     public Set<String> filterSchemas(SystemSecurityContext context, String catalogName, Set<String> schemaNames)
     {
-        return schemaNames.parallelStream().filter(schemaName -> queryOpaWithSimpleResource(context, "FilterSchemas", new OpaQueryInputResource.Builder().schema(new OpaQueryInputResource.CatalogSchema(catalogName, schemaName)).build())).collect(Collectors.toSet());
+        return schemaNames
+                .parallelStream()
+                .filter(schemaName -> queryOpaWithSimpleResource(
+                        context,
+                        "FilterSchemas",
+                        new OpaQueryInputResource
+                                .Builder()
+                                .schema(new OpaQueryInputResource.CatalogSchema(catalogName, schemaName))
+                                .build()))
+                .collect(Collectors.toSet());
     }
 
     @Override
@@ -437,7 +470,16 @@ public class OpaAccessControl
     @Override
     public Set<SchemaTableName> filterTables(SystemSecurityContext context, String catalogName, Set<SchemaTableName> tableNames)
     {
-        return tableNames.parallelStream().filter(tableName -> queryOpaWithSimpleResource(context, "FilterTables", new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(catalogName, tableName)).build())).collect(Collectors.toSet());
+        return tableNames
+                .parallelStream()
+                .filter(tableName -> queryOpaWithSimpleResource(
+                        context,
+                        "FilterTables",
+                        new OpaQueryInputResource
+                                .Builder()
+                                .table(new OpaQueryInputResource.Table(catalogName, tableName))
+                                .build()))
+                .collect(Collectors.toSet());
     }
 
     @Override
@@ -452,7 +494,16 @@ public class OpaAccessControl
     @Override
     public Set<String> filterColumns(SystemSecurityContext context, CatalogSchemaTableName table, Set<String> columns)
     {
-        return columns.parallelStream().filter(column -> queryOpaWithSimpleResource(context, "FilterColumns", new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table, Set.of(column))).build())).collect(Collectors.toSet());
+        return columns
+                .parallelStream()
+                .filter(column -> queryOpaWithSimpleResource(
+                        context,
+                        "FilterColumns",
+                        new OpaQueryInputResource
+                                .Builder()
+                                .table(new OpaQueryInputResource.Table(table, Set.of(column)))
+                                .build()))
+                .collect(Collectors.toSet());
     }
 
     @Override
