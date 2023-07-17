@@ -64,13 +64,9 @@ public class OpaAccessControlSystemTest
     private static InetSocketAddress findAvailableTcpPort()
             throws IOException
     {
-        Socket sock = new Socket();
-        try {
+        try (Socket sock = new Socket()) {
             sock.bind(new InetSocketAddress("127.0.0.1", 0));
             return new InetSocketAddress(sock.getLocalAddress(), sock.getLocalPort());
-        }
-        finally {
-            sock.close();
         }
     }
 

@@ -22,6 +22,7 @@ import io.trino.spi.security.SystemAccessControlFactory;
 
 import java.util.Map;
 
+import static io.airlift.http.client.HttpClientBinder.httpClientBinder;
 import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
 import static java.util.Objects.requireNonNull;
 
@@ -44,6 +45,7 @@ public class OpaAccessControlFactory
                 binder -> {
                     jsonCodecBinder(binder).bindJsonCodec(OpaQuery.class);
                     jsonCodecBinder(binder).bindJsonCodec(OpaAccessControl.OpaQueryResult.class);
+                    httpClientBinder(binder).bindHttpClient("opa-access-control", ForOpa.class);
                 },
                 new OpaAccessControlModule());
 

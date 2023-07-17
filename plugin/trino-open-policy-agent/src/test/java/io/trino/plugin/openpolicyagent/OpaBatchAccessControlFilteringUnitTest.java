@@ -32,7 +32,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -43,6 +42,7 @@ import java.util.Set;
 import java.util.function.BiFunction;
 import java.util.stream.Stream;
 
+import static com.google.common.net.MediaType.JSON_UTF_8;
 import static io.trino.plugin.openpolicyagent.RequestTestUtilities.assertJsonRequestsEqual;
 import static io.trino.plugin.openpolicyagent.RequestTestUtilities.assertStringRequestsEqual;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -61,17 +61,16 @@ public class OpaBatchAccessControlFilteringUnitTest
 
     @BeforeEach
     public void setupAuthorizer()
-            throws InterruptedException, IOException
     {
         this.jsonMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
         this.jsonMapper.registerModule(new Jdk8Module());
-        this.mockClient = new HttpClientUtils.InstrumentedHttpClient();
+        this.mockClient = new HttpClientUtils.InstrumentedHttpClient(opaExtendedServerUri, "POST", JSON_UTF_8.toString(), (request) -> null);
         this.authorizer = (OpaAccessControl) new OpaAccessControlFactory()
                 .create(
                         Map.of(
                                 "opa.policy.uri", opaServerUri.toString(),
                                 "opa.policy.batched-uri", opaExtendedServerUri.toString()));
-        this.authorizer.httpClient = this.mockClient.getHttpClient();
+        this.authorizer.httpClient = this.mockClient;
         this.requestingIdentity = Identity.ofUser("source-user");
         this.requestingSecurityContext = new SystemSecurityContext(requestingIdentity, Optional.empty());
     }
@@ -94,10 +93,10 @@ public class OpaBatchAccessControlFilteringUnitTest
     private static Stream<Arguments> subsetProvider()
     {
         return Stream.of(
-                Arguments.of(Named.of("All-3-resources", HttpClientUtils.buildResponse("{\"result\": [0, 1, 2]}", 200)), List.of(0, 1, 2)),
-                Arguments.of(Named.of("First-and-last-resources", HttpClientUtils.buildResponse("{\"result\": [0, 2]}", 200)), List.of(0, 2)),
-                Arguments.of(Named.of("Only-one-resource", HttpClientUtils.buildResponse("{\"result\": [2]}", 200)), List.of(2)),
-                Arguments.of(Named.of("No-resources", HttpClientUtils.buildResponse("{\"result\": []}", 200)), List.of()));
+                Arguments.of(Named.of("All-3-resources", new HttpClientUtils.MockResponse("{\"result\": [0, 1, 2]}", 200)), List.of(0, 1, 2)),
+                Arguments.of(Named.of("First-and-last-resources", new HttpClientUtils.MockResponse("{\"result\": [0, 2]}", 200)), List.of(0, 2)),
+                Arguments.of(Named.of("Only-one-resource", new HttpClientUtils.MockResponse("{\"result\": [2]}", 200)), List.of(2)),
+                Arguments.of(Named.of("No-resources", new HttpClientUtils.MockResponse("{\"result\": []}", 200)), List.of()));
     }
 
     private <T> List<T> getSubset(List<T> allItems, List<Integer> subsetPositions)
@@ -115,7 +114,7 @@ public class OpaBatchAccessControlFilteringUnitTest
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.OpaBatchAccessControlFilteringUnitTest#subsetProvider")
     public void testFilterViewQueryOwnedBy(
-            HttpResponse<String> response,
+            HttpClientUtils.MockResponse response,
             List<Integer> expectedItems)
     {
         this.mockClient.setHandler((request) -> response);
@@ -144,7 +143,7 @@ public class OpaBatchAccessControlFilteringUnitTest
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.OpaBatchAccessControlFilteringUnitTest#subsetProvider")
     public void testFilterCatalogs(
-            HttpResponse<String> response,
+            HttpClientUtils.MockResponse response,
             List<Integer> expectedItems)
     {
         this.mockClient.setHandler((request) -> response);
@@ -183,7 +182,7 @@ public class OpaBatchAccessControlFilteringUnitTest
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.OpaBatchAccessControlFilteringUnitTest#subsetProvider")
     public void testFilterSchemas(
-            HttpResponse<String> response,
+            HttpClientUtils.MockResponse response,
             List<Integer> expectedItems)
     {
         this.mockClient.setHandler((request) -> response);
@@ -225,7 +224,7 @@ public class OpaBatchAccessControlFilteringUnitTest
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.OpaBatchAccessControlFilteringUnitTest#subsetProvider")
     public void testFilterTables(
-            HttpResponse<String> response,
+            HttpClientUtils.MockResponse response,
             List<Integer> expectedItems)
     {
         this.mockClient.setHandler((request) -> response);
@@ -273,7 +272,7 @@ public class OpaBatchAccessControlFilteringUnitTest
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.OpaBatchAccessControlFilteringUnitTest#subsetProvider")
     public void testFilterColumns(
-            HttpResponse<String> response,
+            HttpClientUtils.MockResponse response,
             List<Integer> expectedItems)
     {
         this.mockClient.setHandler((request) -> response);
@@ -317,7 +316,7 @@ public class OpaBatchAccessControlFilteringUnitTest
     @MethodSource("io.trino.plugin.openpolicyagent.FilteringTestHelpers#prepopulatedErrorCases")
     public void testIllegalResponseThrows(
             BiFunction<OpaAccessControl, SystemSecurityContext, Collection> callable,
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {

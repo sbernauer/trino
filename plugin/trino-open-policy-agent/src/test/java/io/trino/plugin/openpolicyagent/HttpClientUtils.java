@@ -13,127 +13,118 @@
  */
 package io.trino.plugin.openpolicyagent;
 
-import java.io.IOException;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.ByteBuffer;
+import com.google.common.collect.ImmutableListMultimap;
+import io.airlift.http.client.BodyGenerator;
+import io.airlift.http.client.HttpStatus;
+import io.airlift.http.client.Request;
+import io.airlift.http.client.Response;
+import io.airlift.http.client.StaticBodyGenerator;
+import io.airlift.http.client.testing.TestingHttpClient;
+import io.airlift.http.client.testing.TestingResponse;
+
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Flow;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static com.google.common.net.HttpHeaders.CONTENT_TYPE;
+import static com.google.common.net.MediaType.JSON_UTF_8;
+import static java.util.Objects.requireNonNull;
 
 public class HttpClientUtils
 {
     private HttpClientUtils() {}
 
-    public static class RequestSubscriber
-            implements Flow.Subscriber<ByteBuffer>
+    public static class RecordingHttpProcessor
+            implements TestingHttpClient.Processor
     {
-        private final StringBuilder content = new StringBuilder();
-        private final CountDownLatch countdown = new CountDownLatch(1);
+        private final List<String> requests = new LinkedList<>();
+        private Function<String, MockResponse> handler;
+        private final URI expectedURI;
+        private final String expectedMethod;
+        private final String expectedContentType;
 
         @Override
-        public void onSubscribe(Flow.Subscription subscription)
+        public Response handle(Request request)
         {
-            subscription.request(Long.MAX_VALUE);
-        }
-
-        @Override
-        public void onNext(ByteBuffer buf)
-        {
-            content.append(StandardCharsets.UTF_8.decode(buf));
-        }
-
-        @Override
-        public void onError(Throwable throwable)
-        {
-            this.countdown.countDown();
-        }
-
-        @Override
-        public void onComplete()
-        {
-            this.countdown.countDown();
-        }
-
-        public String getContent()
-        {
-            try {
-                if (!this.countdown.await(15, TimeUnit.SECONDS)) {
-                    throw new RuntimeException("Did not receive request body within expected timeframe");
-                }
+            if (!requireNonNull(request.getMethod()).equalsIgnoreCase(expectedMethod)) {
+                throw new IllegalArgumentException("Unexpected method: %s".formatted(request.getMethod()));
             }
-            catch (InterruptedException e) {
-                throw new RuntimeException("Subscriber was interrupted");
+            String actualContentType = request.getHeader(CONTENT_TYPE);
+            if (!requireNonNull(actualContentType).equalsIgnoreCase(expectedContentType)) {
+                throw new IllegalArgumentException("Unexpected content type header: %s".formatted(actualContentType));
             }
-            return this.content.toString();
-        }
-    }
-
-    public static class InstrumentedHttpClient
-    {
-        private HttpClient mockClient;
-        private final List<String> receivedRequests;
-        private Function<String, HttpResponse<String>> handler;
-
-        public InstrumentedHttpClient()
-                throws InterruptedException, IOException
-        {
-            this.mockClient = mock(HttpClient.class);
-            this.receivedRequests = new LinkedList<>();
-            doAnswer(invocation -> {
-                RequestSubscriber sub = new RequestSubscriber();
-                synchronized (this.receivedRequests) {
-                    invocation.getArgument(0, HttpRequest.class).bodyPublisher().get().subscribe(sub);
-                    String requestContent = sub.getContent();
-                    this.receivedRequests.add(requestContent);
-                    if (this.handler != null) {
-                        return this.handler.apply(requestContent);
-                    }
-                    return null;
-                }
-            }).when(mockClient).send(
-                    any(HttpRequest.class),
-                    any(HttpResponse.BodyHandler.class));
+            if (!requireNonNull(request.getUri()).equals(expectedURI)) {
+                throw new IllegalArgumentException("Unexpected URI: %s".formatted(request.getUri().toString()));
+            }
+            BodyGenerator requestBodyGenerator = requireNonNull(request.getBodyGenerator());
+            if (!(requestBodyGenerator instanceof StaticBodyGenerator)) {
+                throw new IllegalArgumentException("Request has an unexpected body generator");
+            }
+            synchronized (this.requests) {
+                String requestContents = new String(((StaticBodyGenerator) requestBodyGenerator).getBody(), StandardCharsets.UTF_8);
+                requests.add(requestContents);
+                return handler.apply(requestContents).buildResponse();
+            }
         }
 
-        public HttpClient getHttpClient()
+        public RecordingHttpProcessor(URI expectedURI, String expectedMethod, String expectedContentType, Function<String, MockResponse> handler)
         {
-            return this.mockClient;
-        }
-
-        public void setHandler(Function<String, HttpResponse<String>> handler)
-        {
+            this.expectedMethod = expectedMethod;
+            this.expectedContentType = expectedContentType;
+            this.expectedURI = expectedURI;
             this.handler = handler;
         }
 
         public List<String> getRequests()
         {
-            synchronized (this.receivedRequests) {
-                return List.copyOf(this.receivedRequests);
+            synchronized (this.requests) {
+                return List.copyOf(this.requests);
             }
         }
 
-        public void resetRequests()
+        public void setHandler(Function<String, MockResponse> handler)
         {
-            this.receivedRequests.clear();
+            this.handler = handler;
         }
     }
 
-    public static HttpResponse<String> buildResponse(String response, int code)
+    public static class InstrumentedHttpClient
+            extends TestingHttpClient
     {
-        HttpResponse<String> mockResponse = mock(HttpResponse.class);
-        when(mockResponse.body()).thenReturn(response);
-        when(mockResponse.statusCode()).thenReturn(code);
-        return mockResponse;
+        private final RecordingHttpProcessor httpProcessor;
+
+        public InstrumentedHttpClient(URI expectedURI, String expectedMethod, String expectedContentType, Function<String, MockResponse> handler)
+        {
+            this(new RecordingHttpProcessor(expectedURI, expectedMethod, expectedContentType, handler));
+        }
+
+        public InstrumentedHttpClient(RecordingHttpProcessor processor)
+        {
+            super(processor);
+            this.httpProcessor = processor;
+        }
+
+        public void setHandler(Function<String, MockResponse> handler)
+        {
+            this.httpProcessor.setHandler(handler);
+        }
+
+        public List<String> getRequests()
+        {
+            return this.httpProcessor.getRequests();
+        }
     }
+
+    public record MockResponse(String contents, int statusCode)
+    {
+        public TestingResponse buildResponse()
+        {
+            return new TestingResponse(
+                    HttpStatus.fromStatusCode(this.statusCode),
+                    ImmutableListMultimap.of(CONTENT_TYPE, JSON_UTF_8.toString()),
+                    this.contents.getBytes(StandardCharsets.UTF_8));
+        }
+    };
 }

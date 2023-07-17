@@ -36,7 +36,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -44,8 +43,8 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.stream.Stream;
 
+import static com.google.common.net.MediaType.JSON_UTF_8;
 import static io.trino.plugin.openpolicyagent.HttpClientUtils.InstrumentedHttpClient;
-import static io.trino.plugin.openpolicyagent.HttpClientUtils.buildResponse;
 import static io.trino.plugin.openpolicyagent.RequestTestUtilities.assertJsonRequestsEqual;
 import static io.trino.plugin.openpolicyagent.RequestTestUtilities.assertStringRequestsEqual;
 import static io.trino.plugin.openpolicyagent.TestHelpers.OK_RESPONSE;
@@ -65,15 +64,13 @@ public class OpaAccessControlUnitTest
 
     @BeforeEach
     public void setupAuthorizer()
-            throws InterruptedException, IOException
     {
-        this.mockClient = new InstrumentedHttpClient();
+        this.mockClient = new InstrumentedHttpClient(opaServerUri, "POST", JSON_UTF_8.toString(), (request) -> OK_RESPONSE);
         this.authorizer = (OpaAccessControl) new OpaAccessControlFactory().create(
                 Map.of("opa.policy.uri", opaServerUri.toString()));
-        this.authorizer.httpClient = this.mockClient.getHttpClient();
+        this.authorizer.httpClient = this.mockClient;
         this.requestingIdentity = Identity.ofUser("source-user");
         this.requestingSecurityContext = new SystemSecurityContext(requestingIdentity, Optional.empty());
-        this.mockClient.setHandler((request) -> OK_RESPONSE);
     }
 
     @AfterEach
@@ -116,7 +113,7 @@ public class OpaAccessControlUnitTest
     @Test
     public void testResponseHasExtraFields()
     {
-        mockClient.setHandler((request) -> buildResponse("""
+        mockClient.setHandler((request) -> new HttpClientUtils.MockResponse("""
                 {
                     "result": true,
                     "decision_id": "foo",
@@ -140,7 +137,7 @@ public class OpaAccessControlUnitTest
     public void testNoResourceActionFailure(
             String actionName,
             BiConsumer<OpaAccessControl, SystemSecurityContext> method,
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -223,7 +220,7 @@ public class OpaAccessControlUnitTest
     public void testTableResourceFailure(
             String actionName,
             FunctionalHelpers.Consumer3<OpaAccessControl, SystemSecurityContext, CatalogSchemaTableName> method,
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -293,7 +290,7 @@ public class OpaAccessControlUnitTest
     public void testTableWithPropertiesActionFailure(
             String actionName,
             FunctionalHelpers.Consumer4<OpaAccessControl, SystemSecurityContext, CatalogSchemaTableName, Map> method,
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -355,7 +352,7 @@ public class OpaAccessControlUnitTest
     public void testIdentityResourceActionsFailure(
             String actionName,
             FunctionalHelpers.Consumer3<OpaAccessControl, SystemSecurityContext, Identity> method,
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -418,7 +415,7 @@ public class OpaAccessControlUnitTest
             String actionName,
             String resourceName,
             FunctionalHelpers.Consumer3<OpaAccessControl, SystemSecurityContext, String> method,
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -474,7 +471,7 @@ public class OpaAccessControlUnitTest
     public void testSchemaResourceActionsFailure(
             String actionName,
             FunctionalHelpers.Consumer3<OpaAccessControl, SystemSecurityContext, CatalogSchemaName> method,
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -525,7 +522,7 @@ public class OpaAccessControlUnitTest
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.TestHelpers#allErrorCasesArgumentProvider")
     public void testCreateSchemaFailure(
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -565,7 +562,7 @@ public class OpaAccessControlUnitTest
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.TestHelpers#allErrorCasesArgumentProvider")
     public void testCanRenameSchemaFailure(
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -632,7 +629,7 @@ public class OpaAccessControlUnitTest
     public void testRenameTableFailure(
             String actionName,
             FunctionalHelpers.Consumer4<OpaAccessControl, SystemSecurityContext, CatalogSchemaTableName, CatalogSchemaTableName> method,
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -677,7 +674,7 @@ public class OpaAccessControlUnitTest
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.TestHelpers#allErrorCasesArgumentProvider")
     public void testCanSetSchemaAuthorizationFailure(
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -743,7 +740,7 @@ public class OpaAccessControlUnitTest
     public void testCanSetTableAuthorizationFailure(
             String actionName,
             FunctionalHelpers.Consumer4<OpaAccessControl, SystemSecurityContext, CatalogSchemaTableName, TrinoPrincipal> method,
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -808,7 +805,7 @@ public class OpaAccessControlUnitTest
     public void testTableColumnOperationsFailure(
             String actionName,
             FunctionalHelpers.Consumer4<OpaAccessControl, SystemSecurityContext, CatalogSchemaTableName, Set<String>> method,
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -854,7 +851,7 @@ public class OpaAccessControlUnitTest
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.TestHelpers#allErrorCasesArgumentProvider")
     public void testCanGrantExecuteFunctionPrivilegeFailure(
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -892,7 +889,7 @@ public class OpaAccessControlUnitTest
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.TestHelpers#allErrorCasesArgumentProvider")
     public void testCanSetCatalogSessionPropertyFailure(
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -971,7 +968,7 @@ public class OpaAccessControlUnitTest
     public void testSchemaPrivilegesFailure(
             String actionName,
             FunctionalHelpers.Consumer5<OpaAccessControl, SystemSecurityContext, Privilege, CatalogSchemaName, TrinoPrincipal> method,
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -1052,7 +1049,7 @@ public class OpaAccessControlUnitTest
     public void testTablePrivilegesFailure(
             String actionName,
             FunctionalHelpers.Consumer5<OpaAccessControl, SystemSecurityContext, Privilege, CatalogSchemaTableName, TrinoPrincipal> method,
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -1104,7 +1101,7 @@ public class OpaAccessControlUnitTest
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.TestHelpers#allErrorCasesArgumentProvider")
     public void testCanCreateRoleFailure(
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -1134,7 +1131,6 @@ public class OpaAccessControlUnitTest
     public void testRoleGranting(
             String actionName,
             FunctionalHelpers.Consumer6<OpaAccessControl, SystemSecurityContext, Set<String>, Set<TrinoPrincipal>, Boolean, Optional<TrinoPrincipal>> method)
-            throws IOException
     {
         TrinoPrincipal grantee = new TrinoPrincipal(PrincipalType.ROLE, "some-grantee-role");
         method.accept(authorizer, requestingSecurityContext, Set.of("some-role-without-grantor"), Set.of(grantee), true, Optional.empty());
@@ -1200,7 +1196,7 @@ public class OpaAccessControlUnitTest
     public void testRoleGrantingFailure(
             String actionName,
             FunctionalHelpers.Consumer6<OpaAccessControl, SystemSecurityContext, Set<String>, Set<TrinoPrincipal>, Boolean, Optional<TrinoPrincipal>> method,
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -1240,7 +1236,7 @@ public class OpaAccessControlUnitTest
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.TestHelpers#allErrorCasesArgumentProvider")
     public void testCanExecuteProcedureFailure(
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -1281,7 +1277,7 @@ public class OpaAccessControlUnitTest
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.TestHelpers#allErrorCasesArgumentProvider")
     public void testCanExecuteTableProcedureFailure(
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {
@@ -1322,7 +1318,7 @@ public class OpaAccessControlUnitTest
     @ParameterizedTest(name = "{index}: {0}")
     @MethodSource("io.trino.plugin.openpolicyagent.TestHelpers#allErrorCasesArgumentProvider")
     public void testCanExecuteFunctionWithFunctionKindFailure(
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {

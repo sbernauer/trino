@@ -36,6 +36,21 @@
 
         <dependency>
             <groupId>io.airlift</groupId>
+            <artifactId>http-client</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.airlift</groupId>
+                    <artifactId>slice</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.openjdk.jol</groupId>
+                    <artifactId>jol-core</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>io.airlift</groupId>
             <artifactId>json</artifactId>
         </dependency>
 

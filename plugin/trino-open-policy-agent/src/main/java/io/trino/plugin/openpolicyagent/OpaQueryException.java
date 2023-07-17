@@ -13,8 +13,6 @@
  */
 package io.trino.plugin.openpolicyagent;
 
-import java.net.http.HttpResponse;
-
 public abstract class OpaQueryException
         extends RuntimeException
 {
@@ -63,10 +61,9 @@ public abstract class OpaQueryException
     public static final class OpaServerError
             extends OpaQueryException
     {
-        public <T> OpaServerError(String policyName, HttpResponse<T> response)
+        public OpaServerError(String policyName, int statusCode, String extra)
         {
-            super("OPA server returned status " + response.statusCode() + " when processing policy "
-                    + policyName + ": " + response.body(), null);
+            super(String.format("OPA server returned status %d when processing policy %s: %s", statusCode, policyName, extra), null);
         }
     }
 

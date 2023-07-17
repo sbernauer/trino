@@ -18,35 +18,32 @@ import io.trino.spi.security.AccessDeniedException;
 import org.junit.jupiter.api.Named;
 import org.junit.jupiter.params.provider.Arguments;
 
-import java.net.http.HttpResponse;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-
-import static io.trino.plugin.openpolicyagent.HttpClientUtils.buildResponse;
 
 public class TestHelpers
 {
     private TestHelpers() {}
 
-    public static final HttpResponse<String> OK_RESPONSE = buildResponse("""
+    public static final HttpClientUtils.MockResponse OK_RESPONSE = new HttpClientUtils.MockResponse("""
             {
                 "decision_id": "",
                 "result": true
             }
             """, 200);
-    public static final HttpResponse<String> NO_ACCESS_RESPONSE = buildResponse("""
+    public static final HttpClientUtils.MockResponse NO_ACCESS_RESPONSE = new HttpClientUtils.MockResponse("""
             {
                 "decision_id": "",
                 "result": false
             }
             """, 200);
-    public static final HttpResponse<String> MALFORMED_RESPONSE = buildResponse("""
+    public static final HttpClientUtils.MockResponse MALFORMED_RESPONSE = new HttpClientUtils.MockResponse("""
             { "this"": is broken_json; }
             """, 200);
-    public static final HttpResponse<String> UNDEFINED_RESPONSE = buildResponse("{}", 404);
-    public static final HttpResponse<String> BAD_REQUEST_RESPONSE = buildResponse("{}", 400);
-    public static final HttpResponse<String> SERVER_ERROR_RESPONSE = buildResponse(null, 500);
+    public static final HttpClientUtils.MockResponse UNDEFINED_RESPONSE = new HttpClientUtils.MockResponse("{}", 404);
+    public static final HttpClientUtils.MockResponse BAD_REQUEST_RESPONSE = new HttpClientUtils.MockResponse("{}", 400);
+    public static final HttpClientUtils.MockResponse SERVER_ERROR_RESPONSE = new HttpClientUtils.MockResponse("", 500);
 
     public static Stream<Arguments> createFailingTestCases(Stream<Arguments> baseTestCases)
     {

@@ -15,6 +15,10 @@ package io.trino.plugin.openpolicyagent;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.inject.Inject;
+import io.airlift.http.client.HttpClient;
+import io.airlift.http.client.JsonResponseHandler;
+import io.airlift.http.client.Request;
+import io.airlift.http.client.UnexpectedResponseException;
 import io.airlift.json.JsonCodec;
 import io.trino.spi.connector.CatalogSchemaName;
 import io.trino.spi.connector.CatalogSchemaRoutineName;
@@ -29,9 +33,6 @@ import io.trino.spi.security.SystemSecurityContext;
 import io.trino.spi.security.TrinoPrincipal;
 
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.security.Principal;
 import java.util.Collection;
 import java.util.HashMap;
@@ -41,6 +42,10 @@ import java.util.Optional;
 import java.util.Set;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static com.google.common.net.HttpHeaders.CONTENT_TYPE;
+import static com.google.common.net.MediaType.JSON_UTF_8;
+import static io.airlift.http.client.JsonBodyGenerator.jsonBodyGenerator;
+import static io.airlift.http.client.Request.Builder.preparePost;
 import static io.trino.spi.security.AccessDeniedException.denyAddColumn;
 import static io.trino.spi.security.AccessDeniedException.denyCatalogAccess;
 import static io.trino.spi.security.AccessDeniedException.denyCommentColumn;
@@ -113,53 +118,48 @@ public class OpaAccessControl
     private final URI opaPolicyUri;
 
     @Inject
-    public OpaAccessControl(JsonCodec<OpaQuery> queryCodec, JsonCodec<OpaQueryResult> queryResultCodec, OpaConfig config)
+    public OpaAccessControl(
+            JsonCodec<OpaQuery> queryCodec,
+            JsonCodec<OpaQueryResult> queryResultCodec,
+            @ForOpa HttpClient httpClient,
+            OpaConfig config)
     {
         this.opaPolicyUri = config.getOpaUri();
-        this.httpClient = HttpClient.newHttpClient();
+        this.httpClient = httpClient;
         this.queryCodec = queryCodec;
         this.queryResultCodec = queryResultCodec;
     }
 
     protected <T> T tryGetResponseFromOpa(OpaQueryInput input, URI uri, JsonCodec<T> deserializer)
     {
-        byte[] queryJson;
-        OpaQuery query = new OpaQuery(input);
-
+        Request request;
         try {
-            queryJson = queryCodec.toJsonBytes(query);
+            request = preparePost()
+                    .addHeader(CONTENT_TYPE, JSON_UTF_8.toString())
+                    .setUri(uri)
+                    .setBodyGenerator(jsonBodyGenerator(queryCodec, new OpaQuery(input)))
+                    .build();
         }
         catch (IllegalArgumentException e) {
             throw new OpaQueryException.SerializeFailed(e);
         }
-        HttpResponse<String> response;
+        T response;
         try {
-            response = httpClient.send(
-                    HttpRequest
-                            .newBuilder(uri)
-                            .header("Content-Type", "application/json")
-                            .POST(HttpRequest.BodyPublishers.ofByteArray(queryJson))
-                            .build(),
-                    HttpResponse.BodyHandlers.ofString());
+            response = httpClient.execute(request, JsonResponseHandler.createJsonResponseHandler(deserializer));
+        }
+        catch (IllegalArgumentException e) {
+            throw new OpaQueryException.DeserializeFailed(e);
+        }
+        catch (UnexpectedResponseException e) {
+            if (e.getStatusCode() == 404) {
+                throw new OpaQueryException.PolicyNotFound(opaPolicyUri.toString());
+            }
+            throw new OpaQueryException.OpaServerError(opaPolicyUri.toString(), e.getStatusCode(), "%s: %s".formatted(e.getMessage(), e.toString()));
         }
         catch (Exception e) {
             throw new OpaQueryException.QueryFailed(e);
         }
-        switch (response.statusCode()) {
-            case 200:
-                break;
-            case 404:
-                throw new OpaQueryException.PolicyNotFound(opaPolicyUri.toString());
-            default:
-                throw new OpaQueryException.OpaServerError(opaPolicyUri.toString(), response);
-        }
-        String body = response.body();
-        try {
-            return deserializer.fromJson(body);
-        }
-        catch (Exception e) {
-            throw new OpaQueryException.DeserializeFailed(e);
-        }
+        return response;
     }
 
     private static String trinoPrincipalToString(TrinoPrincipal principal)

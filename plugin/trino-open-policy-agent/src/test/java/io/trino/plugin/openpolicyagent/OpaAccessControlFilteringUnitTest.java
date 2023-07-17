@@ -27,7 +27,6 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
 import java.net.URI;
-import java.net.http.HttpResponse;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +36,7 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import static com.google.common.net.MediaType.JSON_UTF_8;
 import static io.trino.plugin.openpolicyagent.RequestTestUtilities.assertStringRequestsEqual;
 import static io.trino.plugin.openpolicyagent.TestHelpers.NO_ACCESS_RESPONSE;
 import static io.trino.plugin.openpolicyagent.TestHelpers.OK_RESPONSE;
@@ -56,15 +56,13 @@ public class OpaAccessControlFilteringUnitTest
 
     @BeforeEach
     public void setupAuthorizer()
-            throws InterruptedException, IOException
     {
-        this.mockClient = new HttpClientUtils.InstrumentedHttpClient();
+        this.mockClient = new HttpClientUtils.InstrumentedHttpClient(opaServerUri, "POST", JSON_UTF_8.toString(), (request) -> OK_RESPONSE);
         this.authorizer = (OpaAccessControl) new OpaAccessControlFactory()
                 .create(Map.of("opa.policy.uri", opaServerUri.toString()));
-        this.authorizer.httpClient = this.mockClient.getHttpClient();
+        this.authorizer.httpClient = this.mockClient;
         this.requestingIdentity = Identity.ofUser("source-user");
         this.requestingSecurityContext = new SystemSecurityContext(requestingIdentity, Optional.empty());
-        this.mockClient.setHandler((request) -> OK_RESPONSE);
     }
 
     @AfterEach
@@ -77,7 +75,7 @@ public class OpaAccessControlFilteringUnitTest
         }
     }
 
-    private Function<String, HttpResponse<String>> buildHandler(String jsonPath, String resourceToAccept)
+    private Function<String, HttpClientUtils.MockResponse> buildHandler(String jsonPath, String resourceToAccept)
     {
         return (request) -> {
             try {
@@ -275,7 +273,7 @@ public class OpaAccessControlFilteringUnitTest
     @MethodSource("io.trino.plugin.openpolicyagent.FilteringTestHelpers#prepopulatedErrorCases")
     public void testIllegalResponseThrows(
             BiFunction<OpaAccessControl, SystemSecurityContext, Collection> callable,
-            HttpResponse<String> failureResponse,
+            HttpClientUtils.MockResponse failureResponse,
             Class<? extends Throwable> expectedException,
             String expectedErrorMessage)
     {

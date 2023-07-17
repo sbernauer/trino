@@ -15,6 +15,7 @@ package io.trino.plugin.openpolicyagent;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.inject.Inject;
+import io.airlift.http.client.HttpClient;
 import io.airlift.json.JsonCodec;
 import io.trino.spi.connector.CatalogSchemaTableName;
 import io.trino.spi.connector.SchemaTableName;
@@ -40,9 +41,14 @@ public class OpaBatchAccessControl
     { }
 
     @Inject
-    public OpaBatchAccessControl(JsonCodec<OpaQuery> queryCodec, JsonCodec<OpaQueryResult> queryResultCodec, JsonCodec<OpaBatchAccessControl.OpaBatchQueryResult> batchResultCodec, OpaConfig config)
+    public OpaBatchAccessControl(
+            JsonCodec<OpaQuery> queryCodec,
+            JsonCodec<OpaQueryResult> queryResultCodec,
+            JsonCodec<OpaBatchAccessControl.OpaBatchQueryResult> batchResultCodec,
+            @ForOpa HttpClient httpClient,
+            OpaConfig config)
     {
-        super(queryCodec, queryResultCodec, config);
+        super(queryCodec, queryResultCodec, httpClient, config);
         this.opaBatchedPolicyUri = config.getOpaBatchUri().orElseThrow();
         this.batchResultCodec = batchResultCodec;
     }
