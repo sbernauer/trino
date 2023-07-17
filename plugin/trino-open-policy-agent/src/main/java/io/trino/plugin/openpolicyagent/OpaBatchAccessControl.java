@@ -26,8 +26,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
+
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 public class OpaBatchAccessControl
         extends OpaAccessControl
@@ -76,7 +77,7 @@ public class OpaBatchAccessControl
         return batchQueryOpa(query)
                 .stream()
                 .map(orderedItems::get)
-                .collect(Collectors.toSet());
+                .collect(toImmutableSet());
     }
 
     private <T> Function<Stream<T>, List<OpaQueryInputResource>> mapItemToResource(Function<T, OpaQueryInputResource> converter)
@@ -148,7 +149,7 @@ public class OpaBatchAccessControl
                 columns,
                 (s) -> List.of(new OpaQueryInputResource
                         .Builder()
-                        .table(new OpaQueryInputResource.Table(table, s.collect(Collectors.toSet())))
+                        .table(new OpaQueryInputResource.Table(table, s.collect(toImmutableSet())))
                         .build()));
     }
 }

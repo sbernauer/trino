@@ -42,8 +42,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.trino.spi.security.AccessDeniedException.denyAddColumn;
 import static io.trino.spi.security.AccessDeniedException.denyCatalogAccess;
 import static io.trino.spi.security.AccessDeniedException.denyCommentColumn;
@@ -245,7 +245,7 @@ public class OpaAccessControl
                                 .Builder()
                                 .user(new OpaQueryInputResource.User(queryOwner))
                                 .build()))
-                .collect(Collectors.toSet());
+                .collect(toImmutableSet());
     }
 
     @Override
@@ -305,7 +305,7 @@ public class OpaAccessControl
                                 .Builder()
                                 .catalog(catalog)
                                 .build()))
-                .collect(Collectors.toSet());
+                .collect(toImmutableSet());
     }
 
     @Override
@@ -373,7 +373,7 @@ public class OpaAccessControl
                                 .Builder()
                                 .schema(new OpaQueryInputResource.CatalogSchema(catalogName, schemaName))
                                 .build()))
-                .collect(Collectors.toSet());
+                .collect(toImmutableSet());
     }
 
     @Override
@@ -479,7 +479,7 @@ public class OpaAccessControl
                                 .Builder()
                                 .table(new OpaQueryInputResource.Table(catalogName, tableName))
                                 .build()))
-                .collect(Collectors.toSet());
+                .collect(toImmutableSet());
     }
 
     @Override
@@ -503,7 +503,7 @@ public class OpaAccessControl
                                 .Builder()
                                 .table(new OpaQueryInputResource.Table(table, Set.of(column)))
                                 .build()))
-                .collect(Collectors.toSet());
+                .collect(toImmutableSet());
     }
 
     @Override
