@@ -51,8 +51,8 @@ public class ResponseTests
                     "decision_id": "foo",
                     "result": %s
                 }""".formatted(String.valueOf(response)), OpaAccessControl.OpaQueryResult.class);
-        assertEquals(response, result.result);
-        assertEquals("foo", result.decisionId);
+        assertEquals(response, result.result());
+        assertEquals("foo", result.decisionId());
     }
 
     @ParameterizedTest
@@ -64,8 +64,8 @@ public class ResponseTests
                 {
                     "result": %s
                 }""".formatted(String.valueOf(response)), OpaAccessControl.OpaQueryResult.class);
-        assertEquals(response, result.result);
-        assertNull(result.decisionId);
+        assertEquals(response, result.result());
+        assertNull(result.decisionId());
     }
 
     @Test
@@ -75,8 +75,8 @@ public class ResponseTests
         OpaAccessControl.OpaQueryResult result = this.json.readValue(
                 "{}",
                 OpaAccessControl.OpaQueryResult.class);
-        assertNull(result.result);
-        assertNull(result.decisionId);
+        assertNull(result.result());
+        assertNull(result.decisionId());
     }
 
     @Test
@@ -86,8 +86,8 @@ public class ResponseTests
         OpaBatchAccessControl.OpaBatchQueryResult result = this.json.readValue(
                 "{}",
                 OpaBatchAccessControl.OpaBatchQueryResult.class);
-        assertNull(result.result);
-        assertNull(result.decisionId);
+        assertNull(result.result());
+        assertNull(result.decisionId());
     }
 
     @Test
@@ -98,8 +98,8 @@ public class ResponseTests
                 {
                     "result": []
                 }""", OpaBatchAccessControl.OpaBatchQueryResult.class);
-        assertEquals(List.of(), result.result);
-        assertNull(result.decisionId);
+        assertEquals(List.of(), result.result());
+        assertNull(result.decisionId());
     }
 
     @Test
@@ -110,8 +110,8 @@ public class ResponseTests
                 {
                     "result": [1, 2, 3]
                 }""", OpaBatchAccessControl.OpaBatchQueryResult.class);
-        assertEquals(List.of(1, 2, 3), result.result);
-        assertNull(result.decisionId);
+        assertEquals(List.of(1, 2, 3), result.result());
+        assertNull(result.decisionId());
     }
 
     @Test
@@ -123,7 +123,7 @@ public class ResponseTests
                     "result": [1, 2, 3],
                     "decision_id": "foobar"
                 }""", OpaBatchAccessControl.OpaBatchQueryResult.class);
-        assertEquals(List.of(1, 2, 3), result.result);
-        assertEquals("foobar", result.decisionId);
+        assertEquals(List.of(1, 2, 3), result.result());
+        assertEquals("foobar", result.decisionId());
     }
 }

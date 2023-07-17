@@ -34,12 +34,8 @@ public class OpaBatchAccessControl
 {
     private final URI opaBatchedPolicyUri;
 
-    public static class OpaBatchQueryResult
-    {
-        @JsonProperty("decision_id")
-        public String decisionId;
-        public List<Integer> result;
-    }
+    public record OpaBatchQueryResult(@JsonProperty("decision_id") String decisionId, List<Integer> result)
+    { }
 
     @Inject
     public OpaBatchAccessControl(OpaConfig config)
@@ -56,10 +52,10 @@ public class OpaBatchAccessControl
 
     private List<Integer> batchQueryOpa(OpaQueryInput input)
     {
-        if (input.action.filterResources == null) {
+        if (input.action().filterResources == null) {
             throw new OpaQueryException.OpaInternalPluginError("Cannot send a batch request without a collection of resources");
         }
-        List<Integer> result = tryGetResponseFromOpa(input, opaBatchedPolicyUri, OpaBatchQueryResult.class).result;
+        List<Integer> result = tryGetResponseFromOpa(input, opaBatchedPolicyUri, OpaBatchQueryResult.class).result();
         if (result == null) {
             return List.of();
         }

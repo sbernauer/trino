@@ -887,11 +887,6 @@ public class OpaAccessControl
         }
     }
 
-    public static class OpaQueryResult
-    {
-        @JsonProperty("decision_id")
-        public String decisionId;
-        // boxed Boolean to detect not-present vs explicitly false
-        public Boolean result;
-    }
+    public record OpaQueryResult(@JsonProperty("decision_id") String decisionId, Boolean result)
+    { }
 }
