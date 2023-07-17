@@ -15,13 +15,13 @@ package io.trino.plugin.openpolicyagent;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.inject.Inject;
+import io.airlift.json.JsonCodec;
 import io.trino.spi.connector.CatalogSchemaTableName;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.security.Identity;
 import io.trino.spi.security.SystemSecurityContext;
 
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -33,22 +33,18 @@ import static com.google.common.collect.ImmutableSet.toImmutableSet;
 public class OpaBatchAccessControl
         extends OpaAccessControl
 {
+    private final JsonCodec<OpaBatchAccessControl.OpaBatchQueryResult> batchResultCodec;
     private final URI opaBatchedPolicyUri;
 
     public record OpaBatchQueryResult(@JsonProperty("decision_id") String decisionId, List<Integer> result)
     { }
 
     @Inject
-    public OpaBatchAccessControl(OpaConfig config)
+    public OpaBatchAccessControl(JsonCodec<OpaQuery> queryCodec, JsonCodec<OpaQueryResult> queryResultCodec, JsonCodec<OpaBatchAccessControl.OpaBatchQueryResult> batchResultCodec, OpaConfig config)
     {
-        super(config);
+        super(queryCodec, queryResultCodec, config);
         this.opaBatchedPolicyUri = config.getOpaBatchUri().orElseThrow();
-    }
-
-    public OpaBatchAccessControl(OpaConfig config, HttpClient httpClient)
-    {
-        super(config, httpClient);
-        this.opaBatchedPolicyUri = config.getOpaBatchUri().orElseThrow();
+        this.batchResultCodec = batchResultCodec;
     }
 
     private List<Integer> batchQueryOpa(OpaQueryInput input)
@@ -56,7 +52,7 @@ public class OpaBatchAccessControl
         if (input.action().filterResources == null) {
             throw new OpaQueryException.OpaInternalPluginError("Cannot send a batch request without a collection of resources");
         }
-        List<Integer> result = tryGetResponseFromOpa(input, opaBatchedPolicyUri, OpaBatchQueryResult.class).result();
+        List<Integer> result = tryGetResponseFromOpa(input, opaBatchedPolicyUri, batchResultCodec).result();
         if (result == null) {
             return List.of();
         }
@@ -73,7 +69,7 @@ public class OpaBatchAccessControl
                 .operation(operation)
                 .filterResources(converter.apply(orderedItems.stream()))
                 .build();
-        OpaQueryInput query = new OpaQueryInput(context, action);
+        OpaQueryInput query = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
         return batchQueryOpa(query)
                 .stream()
                 .map(orderedItems::get)

@@ -16,11 +16,13 @@ package io.trino.plugin.openpolicyagent;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import io.airlift.bootstrap.Bootstrap;
+import io.airlift.json.JsonModule;
 import io.trino.spi.security.SystemAccessControl;
 import io.trino.spi.security.SystemAccessControlFactory;
 
 import java.util.Map;
 
+import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
 import static java.util.Objects.requireNonNull;
 
 public class OpaAccessControlFactory
@@ -37,7 +39,13 @@ public class OpaAccessControlFactory
     {
         requireNonNull(config, "config is null");
 
-        Bootstrap app = new Bootstrap(new OpaAccessControlModule());
+        Bootstrap app = new Bootstrap(
+                new JsonModule(),
+                binder -> {
+                    jsonCodecBinder(binder).bindJsonCodec(OpaQuery.class);
+                    jsonCodecBinder(binder).bindJsonCodec(OpaAccessControl.OpaQueryResult.class);
+                },
+                new OpaAccessControlModule());
 
         Injector injector = app
                 .doNotInitializeLogging()

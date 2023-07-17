@@ -13,11 +13,13 @@
  */
 package io.trino.plugin.openpolicyagent;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import io.trino.spi.security.TrinoPrincipal;
 
 import java.util.Collection;
 import java.util.List;
 
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
 public class OpaQueryInputAction
 {
     public final String operation;

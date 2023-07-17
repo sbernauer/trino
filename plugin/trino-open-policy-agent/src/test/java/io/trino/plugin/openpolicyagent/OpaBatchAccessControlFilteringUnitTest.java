@@ -37,6 +37,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
@@ -65,7 +66,12 @@ public class OpaBatchAccessControlFilteringUnitTest
         this.jsonMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
         this.jsonMapper.registerModule(new Jdk8Module());
         this.mockClient = new HttpClientUtils.InstrumentedHttpClient();
-        this.authorizer = new OpaBatchAccessControl(new OpaConfig().setOpaUri(opaServerUri).setOpaBatchUri(opaExtendedServerUri), this.mockClient.getHttpClient());
+        this.authorizer = (OpaAccessControl) new OpaAccessControlFactory()
+                .create(
+                        Map.of(
+                                "opa.policy.uri", opaServerUri.toString(),
+                                "opa.policy.batched-uri", opaExtendedServerUri.toString()));
+        this.authorizer.httpClient = this.mockClient.getHttpClient();
         this.requestingIdentity = Identity.ofUser("source-user");
         this.requestingSecurityContext = new SystemSecurityContext(requestingIdentity, Optional.empty());
     }

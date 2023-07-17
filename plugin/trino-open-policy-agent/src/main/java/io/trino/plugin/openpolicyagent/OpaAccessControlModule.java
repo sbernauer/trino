@@ -21,6 +21,7 @@ import io.trino.spi.security.SystemAccessControl;
 
 import static io.airlift.configuration.ConditionalModule.conditionalModule;
 import static io.airlift.configuration.ConfigBinder.configBinder;
+import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
 
 public class OpaAccessControlModule
         extends AbstractConfigurationAwareModule
@@ -52,6 +53,7 @@ public class OpaAccessControlModule
         @Override
         protected void setup(Binder binder)
         {
+            jsonCodecBinder(binder).bindJsonCodec(OpaBatchAccessControl.OpaBatchQueryResult.class);
             binder.bind(Key.get(SystemAccessControl.class, ForOpa.class)).to(OpaBatchAccessControl.class).in(Scopes.SINGLETON);
         }
     }

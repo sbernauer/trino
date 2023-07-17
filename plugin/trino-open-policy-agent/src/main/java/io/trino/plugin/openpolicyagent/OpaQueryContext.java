@@ -13,5 +13,12 @@
  */
 package io.trino.plugin.openpolicyagent;
 
-public record OpaQueryInput(OpaQueryContext context, OpaQueryInputAction action)
-{ }
+import io.trino.spi.security.SystemSecurityContext;
+
+public record OpaQueryContext(OpaIdentity identity)
+{
+    public static OpaQueryContext fromSystemSecurityContext(SystemSecurityContext ctx)
+    {
+        return new OpaQueryContext(OpaIdentity.fromTrinoIdentity(ctx.getIdentity()));
+    }
+}

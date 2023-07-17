@@ -13,44 +13,40 @@
  */
 package io.trino.plugin.openpolicyagent;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import io.airlift.json.JsonCodec;
+import io.airlift.json.JsonCodecFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import java.io.IOException;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ResponseTests
 {
-    private ObjectMapper json;
+    private JsonCodec<OpaAccessControl.OpaQueryResult> responseCodec;
+    private JsonCodec<OpaBatchAccessControl.OpaBatchQueryResult> batchResponseCodec;
 
     @BeforeEach
     public void setupParser()
     {
-        this.json = new ObjectMapper();
-        // do not include null values
-        this.json.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-        // deal with Optional<T> values
-        this.json.registerModule(new Jdk8Module());
+        this.responseCodec = new JsonCodecFactory().jsonCodec(OpaAccessControl.OpaQueryResult.class);
+        this.batchResponseCodec = new JsonCodecFactory().jsonCodec(OpaBatchAccessControl.OpaBatchQueryResult.class);
     }
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     public void testCanDeserializeOpaSingleResponse(boolean response)
-            throws IOException
     {
-        OpaAccessControl.OpaQueryResult result = this.json.readValue("""
+        OpaAccessControl.OpaQueryResult result = this.responseCodec.fromJson("""
                 {
                     "decision_id": "foo",
                     "result": %s
-                }""".formatted(String.valueOf(response)), OpaAccessControl.OpaQueryResult.class);
+                }""".formatted(String.valueOf(response)));
         assertEquals(response, result.result());
         assertEquals("foo", result.decisionId());
     }
@@ -58,71 +54,87 @@ public class ResponseTests
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     public void testCanDeserializeOpaSingleResponseWithNoDecisionId(boolean response)
-            throws IOException
     {
-        OpaAccessControl.OpaQueryResult result = this.json.readValue("""
+        OpaAccessControl.OpaQueryResult result = this.responseCodec.fromJson("""
                 {
                     "result": %s
-                }""".formatted(String.valueOf(response)), OpaAccessControl.OpaQueryResult.class);
+                }""".formatted(String.valueOf(response)));
         assertEquals(response, result.result());
         assertNull(result.decisionId());
     }
 
     @Test
-    public void testUndefinedDecisionSingleResponse()
-            throws IOException
+    public void testSingleResponseWithExtraFields()
     {
-        OpaAccessControl.OpaQueryResult result = this.json.readValue(
-                "{}",
-                OpaAccessControl.OpaQueryResult.class);
+        OpaAccessControl.OpaQueryResult result = this.responseCodec.fromJson("""
+                {
+                    "result": true,
+                    "someExtraInfo": ["foo"]
+                }""");
+        assertTrue(result.result());
+        assertNull(result.decisionId());
+    }
+
+    @Test
+    public void testUndefinedDecisionSingleResponse()
+    {
+        OpaAccessControl.OpaQueryResult result = this.responseCodec.fromJson("{}");
         assertNull(result.result());
         assertNull(result.decisionId());
     }
 
     @Test
     public void testUndefinedDecisionBatchResponse()
-            throws IOException
     {
-        OpaBatchAccessControl.OpaBatchQueryResult result = this.json.readValue(
-                "{}",
-                OpaBatchAccessControl.OpaBatchQueryResult.class);
+        OpaBatchAccessControl.OpaBatchQueryResult result = this.batchResponseCodec.fromJson("{}");
         assertNull(result.result());
         assertNull(result.decisionId());
     }
 
     @Test
     public void testBatchResponseEmptyNoDecisionId()
-            throws IOException
     {
-        OpaBatchAccessControl.OpaBatchQueryResult result = this.json.readValue("""
+        OpaBatchAccessControl.OpaBatchQueryResult result = this.batchResponseCodec.fromJson("""
                 {
                     "result": []
-                }""", OpaBatchAccessControl.OpaBatchQueryResult.class);
+                }""");
         assertEquals(List.of(), result.result());
         assertNull(result.decisionId());
     }
 
     @Test
     public void testBatchResponseWithItemsNoDecisionId()
-            throws IOException
     {
-        OpaBatchAccessControl.OpaBatchQueryResult result = this.json.readValue("""
+        OpaBatchAccessControl.OpaBatchQueryResult result = this.batchResponseCodec.fromJson("""
                 {
                     "result": [1, 2, 3]
-                }""", OpaBatchAccessControl.OpaBatchQueryResult.class);
+                }""");
         assertEquals(List.of(1, 2, 3), result.result());
         assertNull(result.decisionId());
     }
 
     @Test
     public void testBatchResponseWithItemsAndDecisionId()
-            throws IOException
     {
-        OpaBatchAccessControl.OpaBatchQueryResult result = this.json.readValue("""
+        OpaBatchAccessControl.OpaBatchQueryResult result = this.batchResponseCodec.fromJson("""
                 {
                     "result": [1, 2, 3],
                     "decision_id": "foobar"
-                }""", OpaBatchAccessControl.OpaBatchQueryResult.class);
+                }""");
+        assertEquals(List.of(1, 2, 3), result.result());
+        assertEquals("foobar", result.decisionId());
+    }
+
+    @Test
+    public void testBatchResponseWithExtraFields()
+    {
+        OpaBatchAccessControl.OpaBatchQueryResult result = this.batchResponseCodec.fromJson("""
+                {
+                    "result": [1, 2, 3],
+                    "decision_id": "foobar",
+                    "someInfo": "foo",
+                    "andAnObject": {}
+                }""");
         assertEquals(List.of(1, 2, 3), result.result());
         assertEquals("foobar", result.decisionId());
     }

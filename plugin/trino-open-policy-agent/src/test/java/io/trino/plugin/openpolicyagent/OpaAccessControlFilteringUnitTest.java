@@ -30,6 +30,7 @@ import java.net.URI;
 import java.net.http.HttpResponse;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.BiFunction;
@@ -58,7 +59,9 @@ public class OpaAccessControlFilteringUnitTest
             throws InterruptedException, IOException
     {
         this.mockClient = new HttpClientUtils.InstrumentedHttpClient();
-        this.authorizer = new OpaAccessControl(new OpaConfig().setOpaUri(opaServerUri), this.mockClient.getHttpClient());
+        this.authorizer = (OpaAccessControl) new OpaAccessControlFactory()
+                .create(Map.of("opa.policy.uri", opaServerUri.toString()));
+        this.authorizer.httpClient = this.mockClient.getHttpClient();
         this.requestingIdentity = Identity.ofUser("source-user");
         this.requestingSecurityContext = new SystemSecurityContext(requestingIdentity, Optional.empty());
         this.mockClient.setHandler((request) -> OK_RESPONSE);
@@ -113,11 +116,9 @@ public class OpaAccessControlFilteringUnitTest
                                     "name": "user-one",
                                     "user": "user-one",
                                     "groups": [],
-                                    "principal": null,
                                     "enabledRoles": [],
                                     "catalogRoles": {},
-                                    "extraCredentials": {},
-                                    "roles": {}
+                                    "extraCredentials": {}
                                 }
                             }
                         }""",
@@ -129,11 +130,9 @@ public class OpaAccessControlFilteringUnitTest
                                     "name": "user-two",
                                     "user": "user-two",
                                     "groups": [],
-                                    "principal": null,
                                     "enabledRoles": [],
                                     "catalogRoles": {},
-                                    "extraCredentials": {},
-                                    "roles": {}
+                                    "extraCredentials": {}
                                 }
                             }
                         }""");

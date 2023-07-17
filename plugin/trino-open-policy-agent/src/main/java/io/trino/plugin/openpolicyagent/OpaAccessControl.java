@@ -13,12 +13,9 @@
  */
 package io.trino.plugin.openpolicyagent;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.google.inject.Inject;
+import io.airlift.json.JsonCodec;
 import io.trino.spi.connector.CatalogSchemaName;
 import io.trino.spi.connector.CatalogSchemaRoutineName;
 import io.trino.spi.connector.CatalogSchemaTableName;
@@ -110,36 +107,29 @@ import static java.lang.String.format;
 public class OpaAccessControl
         implements SystemAccessControl
 {
-    private final HttpClient httpClient;
-    private final ObjectMapper json;
+    public HttpClient httpClient;
+    private final JsonCodec<OpaQuery> queryCodec;
+    private final JsonCodec<OpaQueryResult> queryResultCodec;
     private final URI opaPolicyUri;
 
     @Inject
-    public OpaAccessControl(OpaConfig config)
-    {
-        this(config, HttpClient.newHttpClient());
-    }
-
-    public OpaAccessControl(OpaConfig config, HttpClient httpClient)
+    public OpaAccessControl(JsonCodec<OpaQuery> queryCodec, JsonCodec<OpaQueryResult> queryResultCodec, OpaConfig config)
     {
         this.opaPolicyUri = config.getOpaUri();
-        this.json = new ObjectMapper();
-        // do not include null values
-        this.json.setSerializationInclusion(JsonInclude.Include.NON_NULL);
-        // deal with Optional<T> values
-        this.json.registerModule(new Jdk8Module());
-        this.httpClient = httpClient;
+        this.httpClient = HttpClient.newHttpClient();
+        this.queryCodec = queryCodec;
+        this.queryResultCodec = queryResultCodec;
     }
 
-    protected <T> T tryGetResponseFromOpa(OpaQueryInput input, URI uri, Class<T> cls)
+    protected <T> T tryGetResponseFromOpa(OpaQueryInput input, URI uri, JsonCodec<T> deserializer)
     {
         byte[] queryJson;
         OpaQuery query = new OpaQuery(input);
 
         try {
-            queryJson = json.writeValueAsBytes(query);
+            queryJson = queryCodec.toJsonBytes(query);
         }
-        catch (JsonProcessingException e) {
+        catch (IllegalArgumentException e) {
             throw new OpaQueryException.SerializeFailed(e);
         }
         HttpResponse<String> response;
@@ -165,7 +155,7 @@ public class OpaAccessControl
         }
         String body = response.body();
         try {
-            return json.readValue(body, cls);
+            return deserializer.fromJson(body);
         }
         catch (Exception e) {
             throw new OpaQueryException.DeserializeFailed(e);
@@ -179,7 +169,7 @@ public class OpaAccessControl
 
     protected boolean queryOpa(OpaQueryInput input)
     {
-        OpaQueryResult result = tryGetResponseFromOpa(input, opaPolicyUri, OpaQueryResult.class);
+        OpaQueryResult result = tryGetResponseFromOpa(input, opaPolicyUri, queryResultCodec);
         if (result.result == null) {
             return false;
         }
@@ -189,14 +179,14 @@ public class OpaAccessControl
     protected boolean queryOpaWithSimpleAction(SystemSecurityContext context, String operation)
     {
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation(operation).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
         return queryOpa(input);
     }
 
     protected boolean queryOpaWithSimpleResource(SystemSecurityContext context, String operation, OpaQueryInputResource resource)
     {
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation(operation).resource(resource).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
         return queryOpa(input);
     }
 
@@ -332,7 +322,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().schema(new OpaQueryInputResource.CatalogSchema(schema)).build();
         OpaQueryInputResource targetResource = new OpaQueryInputResource.Builder().schema(new OpaQueryInputResource.CatalogSchema(schema.getCatalogName(), newSchemaName)).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("RenameSchema").resource(resource).targetResource(targetResource).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denyRenameSchema(schema.toString(), newSchemaName);
@@ -345,7 +335,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().schema(new OpaQueryInputResource.CatalogSchema(schema)).build();
         OpaQueryInputGrant grantee = new OpaQueryInputGrant.Builder().principal(principal).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("SetSchemaAuthorization").resource(resource).grantee(grantee).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denySetSchemaAuthorization(schema.toString(), principal);
@@ -418,7 +408,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table)).build();
         OpaQueryInputResource targetResource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(newTable)).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("RenameTable").resource(resource).targetResource(targetResource).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denyRenameTable(table.toString(), newTable.toString());
@@ -530,7 +520,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table)).build();
         OpaQueryInputGrant grantee = new OpaQueryInputGrant.Builder().principal(principal).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("SetTableAuthorization").resource(resource).grantee(grantee).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denySetTableAuthorization(table.toString(), principal);
@@ -607,7 +597,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(view)).build();
         OpaQueryInputResource targetResource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(newView)).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("RenameView").resource(resource).targetResource(targetResource).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denyRenameView(view.toString(), newView.toString());
@@ -620,7 +610,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(view)).build();
         OpaQueryInputGrant grantee = new OpaQueryInputGrant.Builder().principal(principal).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("SetViewAuthorization").resource(resource).grantee(grantee).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denySetViewAuthorization(view.toString(), principal);
@@ -694,7 +684,7 @@ public class OpaAccessControl
         OpaQueryInputResource targetResource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(newView)).build();
 
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("RenameMaterializedView").resource(resource).targetResource(targetResource).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denyRenameMaterializedView(view.toString(), newView.toString());
@@ -707,7 +697,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().function(functionName).build();
         OpaQueryInputGrant opaGrantee = new OpaQueryInputGrant.Builder().principal(grantee).grantOption(grantOption).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("GrantExecuteFunctionPrivilege").resource(resource).grantee(opaGrantee).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denyGrantExecuteFunctionPrivilege(functionName, context.getIdentity(), trinoPrincipalToString(grantee));
@@ -719,7 +709,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().catalog(catalogName).catalogSessionProperty(propertyName).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("SetCatalogSessionProperty").resource(resource).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denySetCatalogSessionProperty(propertyName);
@@ -732,7 +722,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().schema(new OpaQueryInputResource.CatalogSchema(schema)).build();
         OpaQueryInputGrant opaGrantee = new OpaQueryInputGrant.Builder().principal(grantee).grantOption(grantOption).privilege(privilege).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("GrantSchemaPrivilege").resource(resource).grantee(opaGrantee).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denyGrantSchemaPrivilege(privilege.toString(), schema.toString());
@@ -745,7 +735,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().schema(new OpaQueryInputResource.CatalogSchema(schema)).build();
         OpaQueryInputGrant opaGrantee = new OpaQueryInputGrant.Builder().principal(grantee).privilege(privilege).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("DenySchemaPrivilege").resource(resource).grantee(opaGrantee).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denyDenySchemaPrivilege(privilege.toString(), schema.toString());
@@ -758,7 +748,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().schema(new OpaQueryInputResource.CatalogSchema(schema)).build();
         OpaQueryInputGrant opaGrantee = new OpaQueryInputGrant.Builder().principal(revokee).grantOption(grantOption).privilege(privilege).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("RevokeSchemaPrivilege").resource(resource).grantee(opaGrantee).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denyRevokeSchemaPrivilege(privilege.toString(), schema.toString());
@@ -771,7 +761,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table)).build();
         OpaQueryInputGrant opaGrantee = new OpaQueryInputGrant.Builder().principal(grantee).grantOption(grantOption).privilege(privilege).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("GrantTablePrivilege").resource(resource).grantee(opaGrantee).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denyGrantTablePrivilege(privilege.toString(), table.toString());
@@ -784,7 +774,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table)).build();
         OpaQueryInputGrant opaGrantee = new OpaQueryInputGrant.Builder().principal(grantee).privilege(privilege).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("DenyTablePrivilege").resource(resource).grantee(opaGrantee).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denyDenyTablePrivilege(privilege.toString(), table.toString());
@@ -797,7 +787,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().table(new OpaQueryInputResource.Table(table)).build();
         OpaQueryInputGrant opaRevokee = new OpaQueryInputGrant.Builder().principal(revokee).privilege(privilege).grantOption(grantOption).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("RevokeTablePrivilege").resource(resource).grantee(opaRevokee).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denyRevokeTablePrivilege(privilege.toString(), table.toString());
@@ -817,7 +807,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().role(role).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("CreateRole").resource(resource).grantor(grantor.orElse(null)).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denyCreateRole(role);
@@ -839,7 +829,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().roles(roles).build();
         OpaQueryInputGrant opaGrantees = new OpaQueryInputGrant.Builder().grantOption(adminOption).principals(grantees).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("GrantRoles").resource(resource).grantee(opaGrantees).grantor(grantor.orElse(null)).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denyGrantRoles(roles, grantees);
@@ -852,7 +842,7 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource.Builder().roles(roles).build();
         OpaQueryInputGrant opaGrantees = new OpaQueryInputGrant.Builder().grantOption(adminOption).principals(grantees).build();
         OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation("RevokeRoles").resource(resource).grantee(opaGrantees).grantor(grantor.orElse(null)).build();
-        OpaQueryInput input = new OpaQueryInput(context, action);
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
         if (!queryOpa(input)) {
             denyRevokeRoles(roles, grantees);
@@ -926,16 +916,6 @@ public class OpaAccessControl
     public Iterable<EventListener> getEventListeners()
     {
         return SystemAccessControl.super.getEventListeners();
-    }
-
-    private static class OpaQuery
-    {
-        public OpaQueryInput input;
-
-        public OpaQuery(OpaQueryInput input)
-        {
-            this.input = input;
-        }
     }
 
     public record OpaQueryResult(@JsonProperty("decision_id") String decisionId, Boolean result)

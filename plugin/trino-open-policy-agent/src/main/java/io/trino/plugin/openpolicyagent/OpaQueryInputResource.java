@@ -13,6 +13,7 @@
  */
 package io.trino.plugin.openpolicyagent;
 
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import io.trino.spi.connector.CatalogSchemaName;
@@ -25,6 +26,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
 public class OpaQueryInputResource
 {
     public User user;
@@ -37,6 +39,7 @@ public class OpaQueryInputResource
     public NamedEntity role;
     public Set<NamedEntity> roles;
 
+    @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
     public static class NamedEntity
     {
         public String name;
@@ -47,6 +50,7 @@ public class OpaQueryInputResource
         }
     }
 
+    @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
     public static class Function
     {
         public String name;
@@ -64,11 +68,12 @@ public class OpaQueryInputResource
         }
     }
 
+    @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
     public static class User
     {
         public String name;
         @JsonUnwrapped
-        public Identity identity;
+        public OpaIdentity identity;
 
         public User(String name)
         {
@@ -77,11 +82,12 @@ public class OpaQueryInputResource
 
         public User(Identity identity)
         {
-            this.identity = identity;
+            this.identity = OpaIdentity.fromTrinoIdentity(identity);
             this.name = identity.getUser();
         }
     }
 
+    @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
     public static class CatalogSchema
     {
         public String catalogName;
@@ -107,6 +113,7 @@ public class OpaQueryInputResource
         }
     }
 
+    @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
     public static class Table
     {
         @JsonUnwrapped

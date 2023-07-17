@@ -13,5 +13,4 @@
  */
 package io.trino.plugin.openpolicyagent;
 
-public record OpaQueryInput(OpaQueryContext context, OpaQueryInputAction action)
-{ }
+public record OpaQuery(OpaQueryInput input) {}

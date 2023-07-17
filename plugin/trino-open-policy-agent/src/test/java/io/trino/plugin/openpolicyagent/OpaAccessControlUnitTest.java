@@ -45,6 +45,7 @@ import java.util.function.BiConsumer;
 import java.util.stream.Stream;
 
 import static io.trino.plugin.openpolicyagent.HttpClientUtils.InstrumentedHttpClient;
+import static io.trino.plugin.openpolicyagent.HttpClientUtils.buildResponse;
 import static io.trino.plugin.openpolicyagent.RequestTestUtilities.assertJsonRequestsEqual;
 import static io.trino.plugin.openpolicyagent.RequestTestUtilities.assertStringRequestsEqual;
 import static io.trino.plugin.openpolicyagent.TestHelpers.OK_RESPONSE;
@@ -67,7 +68,9 @@ public class OpaAccessControlUnitTest
             throws InterruptedException, IOException
     {
         this.mockClient = new InstrumentedHttpClient();
-        this.authorizer = new OpaAccessControl(new OpaConfig().setOpaUri(opaServerUri), this.mockClient.getHttpClient());
+        this.authorizer = (OpaAccessControl) new OpaAccessControlFactory().create(
+                Map.of("opa.policy.uri", opaServerUri.toString()));
+        this.authorizer.httpClient = this.mockClient.getHttpClient();
         this.requestingIdentity = Identity.ofUser("source-user");
         this.requestingSecurityContext = new SystemSecurityContext(requestingIdentity, Optional.empty());
         this.mockClient.setHandler((request) -> OK_RESPONSE);
@@ -108,6 +111,19 @@ public class OpaAccessControlUnitTest
     private static Stream<Arguments> noResourceActionFailureTestCases()
     {
         return createFailingTestCases(noResourceActionTestCases());
+    }
+
+    @Test
+    public void testResponseHasExtraFields()
+    {
+        mockClient.setHandler((request) -> buildResponse("""
+                {
+                    "result": true,
+                    "decision_id": "foo",
+                    "some_debug_info": {"test": ""}
+                }
+                """, 200));
+        authorizer.checkCanShowRoles(requestingSecurityContext);
     }
 
     @ParameterizedTest(name = "{index}: {0}")
@@ -319,11 +335,9 @@ public class OpaAccessControlUnitTest
                             "name": "dummy-user",
                             "user": "dummy-user",
                             "groups": ["some-group"],
-                            "principal": null,
                             "enabledRoles": [],
                             "catalogRoles": {},
-                            "extraCredentials": {"some-extra-credential": "value"},
-                            "roles": {}
+                            "extraCredentials": {"some-extra-credential": "value"}
                         }
                     }
                 }

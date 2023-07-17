@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -169,7 +170,11 @@ public class OpaAccessControlSystemTest
             Session session = Session.builder(sessionPropertyManager)
                     .setQueryId(idGen.createNextQueryId()).setIdentity(identity).build();
             trinoServer = TestingTrinoServer.builder()
-                    .setSystemAccessControls(Collections.singletonList(new OpaAccessControl(new OpaConfig().setOpaUri(opaServerUri.resolve("v1/data/trino/allow")))))
+                    .setSystemAccessControls(
+                            Collections.singletonList(
+                                    new OpaAccessControlFactory()
+                                            .create(
+                                                    Map.of("opa.policy.uri", opaServerUri.resolve("v1/data/trino/allow").toString()))))
                     .build();
             trinoClient = new TestingTrinoClient(trinoServer, session);
         }
@@ -242,7 +247,13 @@ public class OpaAccessControlSystemTest
             Session session = Session.builder(sessionPropertyManager)
                     .setQueryId(idGen.createNextQueryId()).setIdentity(identity).build();
             trinoServer = TestingTrinoServer.builder()
-                    .setSystemAccessControls(Collections.singletonList(new OpaBatchAccessControl(new OpaConfig().setOpaUri(opaServerUri.resolve("v1/data/trino/allow")).setOpaBatchUri(opaServerUri.resolve("v1/data/trino/extended")))))
+                    .setSystemAccessControls(
+                            Collections.singletonList(
+                                    new OpaAccessControlFactory()
+                                            .create(
+                                                    Map.of(
+                                                            "opa.policy.uri", opaServerUri.resolve("v1/data/trino/allow").toString(),
+                                                            "opa.policy.batched-uri", opaServerUri.resolve("v1/data/trino/extended").toString()))))
                     .build();
             trinoClient = new TestingTrinoClient(trinoServer, session);
         }
