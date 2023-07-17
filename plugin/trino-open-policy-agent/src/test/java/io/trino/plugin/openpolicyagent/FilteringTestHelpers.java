@@ -34,14 +34,30 @@ public class FilteringTestHelpers
 
     public static Stream<Arguments> emptyInputTestCases()
     {
-        Stream<BiFunction<OpaAccessControl, SystemSecurityContext, Collection>> callables = Stream.of((authorizer, context) -> authorizer.filterViewQueryOwnedBy(context, Set.<Identity>of()), (authorizer, context) -> authorizer.filterCatalogs(context, Set.of()), (authorizer, context) -> authorizer.filterSchemas(context, "some-catalog", Set.of()), (authorizer, context) -> authorizer.filterTables(context, "some-catalog", Set.of()), (authorizer, context) -> authorizer.filterColumns(context, new CatalogSchemaTableName("some-catalog", "some-schema", "some-table"), Set.of()));
+        Stream<BiFunction<OpaAccessControl, SystemSecurityContext, Collection>> callables = Stream.of(
+                (authorizer, context) -> authorizer.filterViewQueryOwnedBy(context, Set.<Identity>of()),
+                (authorizer, context) -> authorizer.filterCatalogs(context, Set.of()),
+                (authorizer, context) -> authorizer.filterSchemas(context, "some-catalog", Set.of()),
+                (authorizer, context) -> authorizer.filterTables(context, "some-catalog", Set.of()),
+                (authorizer, context) -> authorizer.filterColumns(
+                        context,
+                        new CatalogSchemaTableName("some-catalog", "some-schema", "some-table"),
+                        Set.of()));
         Stream<String> testNames = Stream.of("filterViewQueryOwnedBy", "filterCatalogs", "filterSchemas", "filterTables", "filterColumns");
         return Streams.zip(testNames, callables, (name, method) -> Arguments.of(Named.of(name, method)));
     }
 
     public static Stream<Arguments> prepopulatedErrorCases()
     {
-        Stream<BiFunction<OpaAccessControl, SystemSecurityContext, Collection>> callables = Stream.of((authorizer, context) -> authorizer.filterViewQueryOwnedBy(context, Set.of(Identity.ofUser("foo"))), (authorizer, context) -> authorizer.filterCatalogs(context, Set.of("foo")), (authorizer, context) -> authorizer.filterSchemas(context, "some-catalog", Set.of("foo")), (authorizer, context) -> authorizer.filterTables(context, "some-catalog", Set.of(new SchemaTableName("foo", "bar"))), (authorizer, context) -> authorizer.filterColumns(context, new CatalogSchemaTableName("some-catalog", "some-schema", "some-table"), Set.of("foo")));
+        Stream<BiFunction<OpaAccessControl, SystemSecurityContext, Collection>> callables = Stream.of(
+                (authorizer, context) -> authorizer.filterViewQueryOwnedBy(context, Set.of(Identity.ofUser("foo"))),
+                (authorizer, context) -> authorizer.filterCatalogs(context, Set.of("foo")),
+                (authorizer, context) -> authorizer.filterSchemas(context, "some-catalog", Set.of("foo")),
+                (authorizer, context) -> authorizer.filterTables(context, "some-catalog", Set.of(new SchemaTableName("foo", "bar"))),
+                (authorizer, context) -> authorizer.filterColumns(
+                        context,
+                        new CatalogSchemaTableName("some-catalog", "some-schema", "some-table"),
+                        Set.of("foo")));
         Stream<String> testNames = Stream.of("filterViewQueryOwnedBy", "filterCatalogs", "filterSchemas", "filterTables", "filterColumns");
         return createIllegalResponseTestCases(Streams.zip(testNames, callables, (name, method) -> Arguments.of(Named.of(name, method))));
     }
