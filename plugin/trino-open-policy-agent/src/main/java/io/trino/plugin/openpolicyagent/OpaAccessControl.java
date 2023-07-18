@@ -112,7 +112,7 @@ import static java.lang.String.format;
 public class OpaAccessControl
         implements SystemAccessControl
 {
-    public HttpClient httpClient;
+    private final HttpClient httpClient;
     private final JsonCodec<OpaQuery> queryCodec;
     private final JsonCodec<OpaQueryResult> queryResultCodec;
     private final URI opaPolicyUri;

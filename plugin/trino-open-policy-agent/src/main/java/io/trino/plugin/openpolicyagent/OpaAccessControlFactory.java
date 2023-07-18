@@ -13,14 +13,17 @@
  */
 package io.trino.plugin.openpolicyagent;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Injector;
 import com.google.inject.Key;
 import io.airlift.bootstrap.Bootstrap;
+import io.airlift.http.client.HttpClient;
 import io.airlift.json.JsonModule;
 import io.trino.spi.security.SystemAccessControl;
 import io.trino.spi.security.SystemAccessControlFactory;
 
 import java.util.Map;
+import java.util.Optional;
 
 import static io.airlift.http.client.HttpClientBinder.httpClientBinder;
 import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
@@ -38,6 +41,12 @@ public class OpaAccessControlFactory
     @Override
     public SystemAccessControl create(Map<String, String> config)
     {
+        return create(config, Optional.empty());
+    }
+
+    @VisibleForTesting
+    protected SystemAccessControl create(Map<String, String> config, Optional<HttpClient> httpClient)
+    {
         requireNonNull(config, "config is null");
 
         Bootstrap app = new Bootstrap(
@@ -45,7 +54,12 @@ public class OpaAccessControlFactory
                 binder -> {
                     jsonCodecBinder(binder).bindJsonCodec(OpaQuery.class);
                     jsonCodecBinder(binder).bindJsonCodec(OpaAccessControl.OpaQueryResult.class);
-                    httpClientBinder(binder).bindHttpClient("opa-access-control", ForOpa.class);
+                    if (httpClient.isEmpty()) {
+                        httpClientBinder(binder).bindHttpClient("opa-access-control", ForOpa.class);
+                    }
+                    else {
+                        binder.bind(Key.get(HttpClient.class, ForOpa.class)).toInstance(httpClient.orElseThrow());
+                    }
                 },
                 new OpaAccessControlModule());
 

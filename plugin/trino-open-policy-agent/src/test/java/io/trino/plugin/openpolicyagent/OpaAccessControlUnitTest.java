@@ -67,8 +67,8 @@ public class OpaAccessControlUnitTest
     {
         this.mockClient = new InstrumentedHttpClient(opaServerUri, "POST", JSON_UTF_8.toString(), (request) -> OK_RESPONSE);
         this.authorizer = (OpaAccessControl) new OpaAccessControlFactory().create(
-                Map.of("opa.policy.uri", opaServerUri.toString()));
-        this.authorizer.httpClient = this.mockClient;
+                Map.of("opa.policy.uri", opaServerUri.toString()),
+                Optional.of(mockClient));
         this.requestingIdentity = Identity.ofUser("source-user");
         this.requestingSecurityContext = new SystemSecurityContext(requestingIdentity, Optional.empty());
     }

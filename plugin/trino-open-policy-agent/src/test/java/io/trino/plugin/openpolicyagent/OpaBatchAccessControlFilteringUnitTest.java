@@ -69,8 +69,8 @@ public class OpaBatchAccessControlFilteringUnitTest
                 .create(
                         Map.of(
                                 "opa.policy.uri", opaServerUri.toString(),
-                                "opa.policy.batched-uri", opaExtendedServerUri.toString()));
-        this.authorizer.httpClient = this.mockClient;
+                                "opa.policy.batched-uri", opaExtendedServerUri.toString()),
+                        Optional.of(mockClient));
         this.requestingIdentity = Identity.ofUser("source-user");
         this.requestingSecurityContext = new SystemSecurityContext(requestingIdentity, Optional.empty());
     }
