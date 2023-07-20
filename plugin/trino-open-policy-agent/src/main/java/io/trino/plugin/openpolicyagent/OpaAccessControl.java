@@ -13,19 +13,13 @@
  */
 package io.trino.plugin.openpolicyagent;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.inject.Inject;
-import io.airlift.http.client.FullJsonResponseHandler.JsonResponse;
 import io.airlift.http.client.HttpClient;
-import io.airlift.http.client.HttpClient.HttpResponseFuture;
-import io.airlift.http.client.HttpStatus;
-import io.airlift.http.client.Request;
 import io.airlift.json.JsonCodec;
 import io.trino.spi.connector.CatalogSchemaName;
 import io.trino.spi.connector.CatalogSchemaRoutineName;
 import io.trino.spi.connector.CatalogSchemaTableName;
 import io.trino.spi.connector.SchemaTableName;
-import io.trino.spi.eventlistener.EventListener;
 import io.trino.spi.function.FunctionKind;
 import io.trino.spi.security.Identity;
 import io.trino.spi.security.Privilege;
@@ -41,14 +35,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 
-import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static com.google.common.net.HttpHeaders.CONTENT_TYPE;
-import static com.google.common.net.MediaType.JSON_UTF_8;
-import static io.airlift.http.client.FullJsonResponseHandler.createFullJsonResponseHandler;
-import static io.airlift.http.client.JsonBodyGenerator.jsonBodyGenerator;
-import static io.airlift.http.client.Request.Builder.preparePost;
+import static io.trino.plugin.openpolicyagent.OpaHttpClient.propagatingConsumeFuture;
 import static io.trino.spi.security.AccessDeniedException.denyAddColumn;
 import static io.trino.spi.security.AccessDeniedException.denyCatalogAccess;
 import static io.trino.spi.security.AccessDeniedException.denyCommentColumn;
@@ -115,10 +103,9 @@ import static java.lang.String.format;
 public class OpaAccessControl
         implements SystemAccessControl
 {
-    private final HttpClient httpClient;
-    private final JsonCodec<OpaQuery> queryCodec;
     private final JsonCodec<OpaQueryResult> queryResultCodec;
     private final URI opaPolicyUri;
+    protected final OpaHttpClient opaHttpClient;
 
     @Inject
     public OpaAccessControl(
@@ -128,48 +115,8 @@ public class OpaAccessControl
             OpaConfig config)
     {
         this.opaPolicyUri = config.getOpaUri();
-        this.httpClient = httpClient;
-        this.queryCodec = queryCodec;
+        this.opaHttpClient = new OpaHttpClient(httpClient, queryCodec);
         this.queryResultCodec = queryResultCodec;
-    }
-
-    protected <T> HttpResponseFuture<JsonResponse<T>> submitRequestToOpa(OpaQueryInput input, URI uri, JsonCodec<T> deserializer)
-    {
-        Request request;
-        try {
-            request = preparePost()
-                    .addHeader(CONTENT_TYPE, JSON_UTF_8.toString())
-                    .setUri(uri)
-                    .setBodyGenerator(jsonBodyGenerator(queryCodec, new OpaQuery(input)))
-                    .build();
-        }
-        catch (IllegalArgumentException e) {
-            throw new OpaQueryException.SerializeFailed(e);
-        }
-        return httpClient.executeAsync(request, createFullJsonResponseHandler(deserializer));
-    }
-
-    protected <T> T tryGetResponseFromOpa(OpaQueryInput input, URI uri, JsonCodec<T> deserializer) {
-        try {
-            JsonResponse<T> response = submitRequestToOpa(input, uri, deserializer).get();
-            int statusCode = response.getStatusCode();
-            if (HttpStatus.familyForStatusCode(statusCode) != HttpStatus.Family.SUCCESSFUL) {
-                if (statusCode == HttpStatus.NOT_FOUND.code()) {
-                    throw new OpaQueryException.PolicyNotFound(opaPolicyUri.toString());
-                }
-                throw new OpaQueryException.OpaServerError(opaPolicyUri.toString(), statusCode, response.toString());
-            }
-            if (!response.hasValue()) {
-                throw new OpaQueryException.DeserializeFailed(response.getException());
-            }
-            return response.getValue();
-        }
-        catch (ExecutionException e) {
-            throw new OpaQueryException.QueryFailed(e);
-        }
-        catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     private static String trinoPrincipalToString(TrinoPrincipal principal)
@@ -179,25 +126,29 @@ public class OpaAccessControl
 
     protected boolean queryOpa(OpaQueryInput input)
     {
-        OpaQueryResult result = tryGetResponseFromOpa(input, opaPolicyUri, queryResultCodec);
-        if (result.result == null) {
-            return false;
-        }
-        return result.result;
+        return propagatingConsumeFuture(opaHttpClient.submitOpaRequest(input, opaPolicyUri, queryResultCodec)).result();
+    }
+
+    private OpaQueryInput buildQueryInputForSimpleAction(SystemSecurityContext context, String operation)
+    {
+        OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation(operation).build();
+        return new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
+    }
+
+    private OpaQueryInput buildQueryInputForSimpleResource(SystemSecurityContext context, String operation, OpaQueryInputResource resource)
+    {
+        OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation(operation).resource(resource).build();
+        return new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
     }
 
     protected boolean queryOpaWithSimpleAction(SystemSecurityContext context, String operation)
     {
-        OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation(operation).build();
-        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
-        return queryOpa(input);
+        return queryOpa(buildQueryInputForSimpleAction(context, operation));
     }
 
     protected boolean queryOpaWithSimpleResource(SystemSecurityContext context, String operation, OpaQueryInputResource resource)
     {
-        OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation(operation).resource(resource).build();
-        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
-        return queryOpa(input);
+        return queryOpa(buildQueryInputForSimpleResource(context, operation, resource));
     }
 
     @Override
@@ -236,16 +187,16 @@ public class OpaAccessControl
     @Override
     public Collection<Identity> filterViewQueryOwnedBy(SystemSecurityContext context, Collection<Identity> queryOwners)
     {
-        return queryOwners
-                .parallelStream()
-                .filter(queryOwner -> queryOpaWithSimpleResource(
+        return opaHttpClient.parallelFilterFromOpa(
+                queryOwners,
+                (i) -> buildQueryInputForSimpleResource(
                         context,
                         "FilterViewQueryOwnedBy",
-                        new OpaQueryInputResource
-                                .Builder()
-                                .user(new OpaQueryInputResource.User(queryOwner))
-                                .build()))
-                .collect(toImmutableSet());
+                        new OpaQueryInputResource.Builder()
+                                .user(new OpaQueryInputResource.User(i))
+                                .build()),
+                opaPolicyUri,
+                queryResultCodec);
     }
 
     @Override
@@ -296,16 +247,17 @@ public class OpaAccessControl
     @Override
     public Set<String> filterCatalogs(SystemSecurityContext context, Set<String> catalogs)
     {
-        return catalogs
-                .parallelStream()
-                .filter(catalog -> queryOpaWithSimpleResource(
+        return opaHttpClient.parallelFilterFromOpa(
+                catalogs,
+                (c) -> buildQueryInputForSimpleResource(
                         context,
                         "FilterCatalogs",
                         new OpaQueryInputResource
                                 .Builder()
-                                .catalog(catalog)
-                                .build()))
-                .collect(toImmutableSet());
+                                .catalog(c)
+                                .build()),
+                opaPolicyUri,
+                queryResultCodec);
     }
 
     @Override
@@ -364,16 +316,17 @@ public class OpaAccessControl
     @Override
     public Set<String> filterSchemas(SystemSecurityContext context, String catalogName, Set<String> schemaNames)
     {
-        return schemaNames
-                .parallelStream()
-                .filter(schemaName -> queryOpaWithSimpleResource(
+        return opaHttpClient.parallelFilterFromOpa(
+                schemaNames,
+                (s) -> buildQueryInputForSimpleResource(
                         context,
                         "FilterSchemas",
                         new OpaQueryInputResource
                                 .Builder()
-                                .schema(new OpaQueryInputResource.CatalogSchema(catalogName, schemaName))
-                                .build()))
-                .collect(toImmutableSet());
+                                .schema(new OpaQueryInputResource.CatalogSchema(catalogName, s))
+                                .build()),
+                opaPolicyUri,
+                queryResultCodec);
     }
 
     @Override
@@ -470,16 +423,17 @@ public class OpaAccessControl
     @Override
     public Set<SchemaTableName> filterTables(SystemSecurityContext context, String catalogName, Set<SchemaTableName> tableNames)
     {
-        return tableNames
-                .parallelStream()
-                .filter(tableName -> queryOpaWithSimpleResource(
+        return opaHttpClient.parallelFilterFromOpa(
+                tableNames,
+                (tbl) -> buildQueryInputForSimpleResource(
                         context,
                         "FilterTables",
                         new OpaQueryInputResource
                                 .Builder()
-                                .table(new OpaQueryInputResource.Table(catalogName, tableName))
-                                .build()))
-                .collect(toImmutableSet());
+                                .table(new OpaQueryInputResource.Table(catalogName, tbl))
+                                .build()),
+                opaPolicyUri,
+                queryResultCodec);
     }
 
     @Override
@@ -494,16 +448,17 @@ public class OpaAccessControl
     @Override
     public Set<String> filterColumns(SystemSecurityContext context, CatalogSchemaTableName table, Set<String> columns)
     {
-        return columns
-                .parallelStream()
-                .filter(column -> queryOpaWithSimpleResource(
+        return opaHttpClient.parallelFilterFromOpa(
+                columns,
+                (column) -> buildQueryInputForSimpleResource(
                         context,
                         "FilterColumns",
                         new OpaQueryInputResource
                                 .Builder()
                                 .table(new OpaQueryInputResource.Table(table, Set.of(column)))
-                                .build()))
-                .collect(toImmutableSet());
+                                .build()),
+                opaPolicyUri,
+                queryResultCodec);
     }
 
     @Override
@@ -921,13 +876,4 @@ public class OpaAccessControl
             denyExecuteTableProcedure(table.toString(), procedure);
         }
     }
-
-    @Override
-    public Iterable<EventListener> getEventListeners()
-    {
-        return SystemAccessControl.super.getEventListeners();
-    }
-
-    public record OpaQueryResult(@JsonProperty("decision_id") String decisionId, Boolean result)
-    { }
 }

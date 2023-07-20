@@ -23,26 +23,27 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class ResponseTests
 {
-    private JsonCodec<OpaAccessControl.OpaQueryResult> responseCodec;
-    private JsonCodec<OpaBatchAccessControl.OpaBatchQueryResult> batchResponseCodec;
+    private JsonCodec<OpaQueryResult> responseCodec;
+    private JsonCodec<OpaBatchQueryResult> batchResponseCodec;
 
     @BeforeEach
     public void setupParser()
     {
-        this.responseCodec = new JsonCodecFactory().jsonCodec(OpaAccessControl.OpaQueryResult.class);
-        this.batchResponseCodec = new JsonCodecFactory().jsonCodec(OpaBatchAccessControl.OpaBatchQueryResult.class);
+        this.responseCodec = new JsonCodecFactory().jsonCodec(OpaQueryResult.class);
+        this.batchResponseCodec = new JsonCodecFactory().jsonCodec(OpaBatchQueryResult.class);
     }
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     public void testCanDeserializeOpaSingleResponse(boolean response)
     {
-        OpaAccessControl.OpaQueryResult result = this.responseCodec.fromJson("""
+        OpaQueryResult result = this.responseCodec.fromJson("""
                 {
                     "decision_id": "foo",
                     "result": %s
@@ -55,7 +56,7 @@ public class ResponseTests
     @ValueSource(booleans = {false, true})
     public void testCanDeserializeOpaSingleResponseWithNoDecisionId(boolean response)
     {
-        OpaAccessControl.OpaQueryResult result = this.responseCodec.fromJson("""
+        OpaQueryResult result = this.responseCodec.fromJson("""
                 {
                     "result": %s
                 }""".formatted(String.valueOf(response)));
@@ -66,7 +67,7 @@ public class ResponseTests
     @Test
     public void testSingleResponseWithExtraFields()
     {
-        OpaAccessControl.OpaQueryResult result = this.responseCodec.fromJson("""
+        OpaQueryResult result = this.responseCodec.fromJson("""
                 {
                     "result": true,
                     "someExtraInfo": ["foo"]
@@ -76,17 +77,17 @@ public class ResponseTests
     }
 
     @Test
-    public void testUndefinedDecisionSingleResponse()
+    public void testUndefinedDecisionSingleResponseTreatedAsDeny()
     {
-        OpaAccessControl.OpaQueryResult result = this.responseCodec.fromJson("{}");
-        assertNull(result.result());
+        OpaQueryResult result = this.responseCodec.fromJson("{}");
+        assertFalse(result.result());
         assertNull(result.decisionId());
     }
 
     @Test
     public void testUndefinedDecisionBatchResponse()
     {
-        OpaBatchAccessControl.OpaBatchQueryResult result = this.batchResponseCodec.fromJson("{}");
+        OpaBatchQueryResult result = this.batchResponseCodec.fromJson("{}");
         assertNull(result.result());
         assertNull(result.decisionId());
     }
@@ -94,7 +95,7 @@ public class ResponseTests
     @Test
     public void testBatchResponseEmptyNoDecisionId()
     {
-        OpaBatchAccessControl.OpaBatchQueryResult result = this.batchResponseCodec.fromJson("""
+        OpaBatchQueryResult result = this.batchResponseCodec.fromJson("""
                 {
                     "result": []
                 }""");
@@ -105,7 +106,7 @@ public class ResponseTests
     @Test
     public void testBatchResponseWithItemsNoDecisionId()
     {
-        OpaBatchAccessControl.OpaBatchQueryResult result = this.batchResponseCodec.fromJson("""
+        OpaBatchQueryResult result = this.batchResponseCodec.fromJson("""
                 {
                     "result": [1, 2, 3]
                 }""");
@@ -116,7 +117,7 @@ public class ResponseTests
     @Test
     public void testBatchResponseWithItemsAndDecisionId()
     {
-        OpaBatchAccessControl.OpaBatchQueryResult result = this.batchResponseCodec.fromJson("""
+        OpaBatchQueryResult result = this.batchResponseCodec.fromJson("""
                 {
                     "result": [1, 2, 3],
                     "decision_id": "foobar"
@@ -128,7 +129,7 @@ public class ResponseTests
     @Test
     public void testBatchResponseWithExtraFields()
     {
-        OpaBatchAccessControl.OpaBatchQueryResult result = this.batchResponseCodec.fromJson("""
+        OpaBatchQueryResult result = this.batchResponseCodec.fromJson("""
                 {
                     "result": [1, 2, 3],
                     "decision_id": "foobar",

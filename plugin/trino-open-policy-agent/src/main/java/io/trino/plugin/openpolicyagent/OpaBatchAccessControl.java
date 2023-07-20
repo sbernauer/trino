@@ -13,7 +13,8 @@
  */
 package io.trino.plugin.openpolicyagent;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 import io.airlift.http.client.HttpClient;
 import io.airlift.json.JsonCodec;
@@ -27,24 +28,22 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.stream.Stream;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static io.trino.plugin.openpolicyagent.OpaHttpClient.propagatingConsumeFuture;
+import static java.util.Objects.requireNonNull;
 
 public class OpaBatchAccessControl
         extends OpaAccessControl
 {
-    private final JsonCodec<OpaBatchAccessControl.OpaBatchQueryResult> batchResultCodec;
+    private final JsonCodec<OpaBatchQueryResult> batchResultCodec;
     private final URI opaBatchedPolicyUri;
-
-    public record OpaBatchQueryResult(@JsonProperty("decision_id") String decisionId, List<Integer> result)
-    { }
 
     @Inject
     public OpaBatchAccessControl(
             JsonCodec<OpaQuery> queryCodec,
             JsonCodec<OpaQueryResult> queryResultCodec,
-            JsonCodec<OpaBatchAccessControl.OpaBatchQueryResult> batchResultCodec,
+            JsonCodec<OpaBatchQueryResult> batchResultCodec,
             @ForOpa HttpClient httpClient,
             OpaConfig config)
     {
@@ -55,25 +54,18 @@ public class OpaBatchAccessControl
 
     private List<Integer> batchQueryOpa(OpaQueryInput input)
     {
-        if (input.action().filterResources == null) {
-            throw new OpaQueryException.OpaInternalPluginError("Cannot send a batch request without a collection of resources");
-        }
-        List<Integer> result = tryGetResponseFromOpa(input, opaBatchedPolicyUri, batchResultCodec).result();
-        if (result == null) {
-            return List.of();
-        }
-        return result;
+        return propagatingConsumeFuture(opaHttpClient.submitOpaRequest(input, opaBatchedPolicyUri, batchResultCodec)).result();
     }
 
-    private <T> Set<T> filterFromOpa(SystemSecurityContext context, String operation, Collection<T> items, Function<Stream<T>, List<OpaQueryInputResource>> converter)
+    private <T> Set<T> batchFilterFromOpa(SystemSecurityContext context, String operation, Collection<T> items, Function<List<T>, List<OpaQueryInputResource>> converter)
     {
-        List<T> orderedItems = List.copyOf(items);
-        if (orderedItems.isEmpty()) {
-            return Set.of();
+        if (items.isEmpty()) {
+            return ImmutableSet.of();
         }
+        List<T> orderedItems = ImmutableList.copyOf(items);
         OpaQueryInputAction action = new OpaQueryInputAction.Builder()
                 .operation(operation)
-                .filterResources(converter.apply(orderedItems.stream()))
+                .filterResources(requireNonNull(converter.apply(orderedItems)))
                 .build();
         OpaQueryInput query = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
         return batchQueryOpa(query)
@@ -82,15 +74,15 @@ public class OpaBatchAccessControl
                 .collect(toImmutableSet());
     }
 
-    private <T> Function<Stream<T>, List<OpaQueryInputResource>> mapItemToResource(Function<T, OpaQueryInputResource> converter)
+    private <T> Function<List<T>, List<OpaQueryInputResource>> mapItemToResource(Function<T, OpaQueryInputResource> converter)
     {
-        return (s) -> s.map(converter).toList();
+        return (s) -> s.stream().map(converter).toList();
     }
 
     @Override
     public Collection<Identity> filterViewQueryOwnedBy(SystemSecurityContext context, Collection<Identity> queryOwners)
     {
-        return filterFromOpa(
+        return batchFilterFromOpa(
                 context,
                 "FilterViewQueryOwnedBy",
                 queryOwners,
@@ -103,7 +95,7 @@ public class OpaBatchAccessControl
     @Override
     public Set<String> filterCatalogs(SystemSecurityContext context, Set<String> catalogs)
     {
-        return filterFromOpa(
+        return batchFilterFromOpa(
                 context,
                 "FilterCatalogs",
                 catalogs,
@@ -117,7 +109,7 @@ public class OpaBatchAccessControl
     @Override
     public Set<String> filterSchemas(SystemSecurityContext context, String catalogName, Set<String> schemaNames)
     {
-        return filterFromOpa(
+        return batchFilterFromOpa(
                 context,
                 "FilterSchemas",
                 schemaNames,
@@ -131,7 +123,7 @@ public class OpaBatchAccessControl
     @Override
     public Set<SchemaTableName> filterTables(SystemSecurityContext context, String catalogName, Set<SchemaTableName> tableNames)
     {
-        return filterFromOpa(
+        return batchFilterFromOpa(
                 context,
                 "FilterTables",
                 tableNames,
@@ -145,13 +137,13 @@ public class OpaBatchAccessControl
     @Override
     public Set<String> filterColumns(SystemSecurityContext context, CatalogSchemaTableName table, Set<String> columns)
     {
-        return filterFromOpa(
+        return batchFilterFromOpa(
                 context,
                 "FilterColumns",
                 columns,
                 (s) -> List.of(new OpaQueryInputResource
                         .Builder()
-                        .table(new OpaQueryInputResource.Table(table, s.collect(toImmutableSet())))
+                        .table(new OpaQueryInputResource.Table(table, ImmutableSet.copyOf(s)))
                         .build()));
     }
 }

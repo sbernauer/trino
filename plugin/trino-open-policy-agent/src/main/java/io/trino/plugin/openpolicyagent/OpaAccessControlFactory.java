@@ -53,7 +53,7 @@ public class OpaAccessControlFactory
                 new JsonModule(),
                 binder -> {
                     jsonCodecBinder(binder).bindJsonCodec(OpaQuery.class);
-                    jsonCodecBinder(binder).bindJsonCodec(OpaAccessControl.OpaQueryResult.class);
+                    jsonCodecBinder(binder).bindJsonCodec(OpaQueryResult.class);
                     if (httpClient.isEmpty()) {
                         httpClientBinder(binder).bindHttpClient("opa-access-control", ForOpa.class);
                     }

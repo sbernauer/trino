@@ -53,7 +53,7 @@ public class OpaAccessControlModule
         @Override
         protected void setup(Binder binder)
         {
-            jsonCodecBinder(binder).bindJsonCodec(OpaBatchAccessControl.OpaBatchQueryResult.class);
+            jsonCodecBinder(binder).bindJsonCodec(OpaBatchQueryResult.class);
             binder.bind(Key.get(SystemAccessControl.class, ForOpa.class)).to(OpaBatchAccessControl.class).in(Scopes.SINGLETON);
         }
     }
