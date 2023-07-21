@@ -144,7 +144,9 @@ public class OpaAccessControlUnitTest
     {
         mockClient.setHandler((request) -> failureResponse);
 
-        Throwable actualError = assertThrows(expectedException, () -> method.accept(authorizer, requestingSecurityContext));
+        Throwable actualError = assertThrows(
+                expectedException,
+                () -> method.accept(authorizer, requestingSecurityContext));
         ObjectNode expectedRequest = jsonMapper.createObjectNode().put("operation", actionName);
         assertJsonRequestsEqual(Set.of(expectedRequest), mockClient.getRequests(), "/input/action");
         assertTrue(actualError.getMessage().contains(expectedErrorMessage),
@@ -194,7 +196,10 @@ public class OpaAccessControlUnitTest
             String actionName,
             FunctionalHelpers.Consumer3<OpaAccessControl, SystemSecurityContext, CatalogSchemaTableName> callable)
     {
-        callable.accept(authorizer, requestingSecurityContext, new CatalogSchemaTableName("my-catalog", "my-schema", "my-table"));
+        callable.accept(
+                authorizer,
+                requestingSecurityContext,
+                new CatalogSchemaTableName("my-catalog", "my-schema", "my-table"));
 
         String expectedRequest = """
                 {
@@ -227,7 +232,12 @@ public class OpaAccessControlUnitTest
     {
         mockClient.setHandler((request) -> failureResponse);
 
-        Throwable actualError = assertThrows(expectedException, () -> method.accept(authorizer, requestingSecurityContext, new CatalogSchemaTableName("catalog", "schema", "table")));
+        Throwable actualError = assertThrows(
+                expectedException,
+                () -> method.accept(
+                        authorizer,
+                        requestingSecurityContext,
+                        new CatalogSchemaTableName("catalog", "schema", "table")));
         assertTrue(actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
     }
@@ -302,7 +312,13 @@ public class OpaAccessControlUnitTest
     {
         mockClient.setHandler((request) -> failureResponse);
 
-        Throwable actualError = assertThrows(expectedException, () -> method.accept(authorizer, requestingSecurityContext, new CatalogSchemaTableName("catalog", "schema", "table"), Map.of()));
+        Throwable actualError = assertThrows(
+                expectedException,
+                () -> method.accept(
+                        authorizer,
+                        requestingSecurityContext,
+                        new CatalogSchemaTableName("catalog", "schema", "table"),
+                        Map.of()));
         assertTrue(actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
     }
@@ -364,7 +380,12 @@ public class OpaAccessControlUnitTest
     {
         mockClient.setHandler((request) -> failureResponse);
 
-        Throwable actualError = assertThrows(expectedException, () -> method.accept(authorizer, requestingSecurityContext, Identity.ofUser("dummy-user")));
+        Throwable actualError = assertThrows(
+                expectedException,
+                () -> method.accept(
+                        authorizer,
+                        requestingSecurityContext,
+                        Identity.ofUser("dummy-user")));
         assertTrue(actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
     }
@@ -385,7 +406,10 @@ public class OpaAccessControlUnitTest
                 FunctionalHelpers.Pair.of("ShowSchemas", "catalog"),
                 FunctionalHelpers.Pair.of("DropRole", "role"),
                 FunctionalHelpers.Pair.of("ExecuteFunction", "function"));
-        return Streams.zip(actionAndResource, methods, (action, method) -> Arguments.of(Named.of(action.getFirst(), action.getFirst()), action.getSecond(), method));
+        return Streams.zip(
+                actionAndResource,
+                methods,
+                (action, method) -> Arguments.of(Named.of(action.getFirst(), action.getFirst()), action.getSecond(), method));
     }
 
     @ParameterizedTest(name = "{index}: {0}")
@@ -427,7 +451,12 @@ public class OpaAccessControlUnitTest
     {
         mockClient.setHandler((request) -> failureResponse);
 
-        Throwable actualError = assertThrows(expectedException, () -> method.accept(authorizer, requestingSecurityContext, "dummy-value"));
+        Throwable actualError = assertThrows(
+                expectedException,
+                () -> method.accept(
+                        authorizer,
+                        requestingSecurityContext,
+                        "dummy-value"));
         assertTrue(actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
     }
@@ -483,7 +512,12 @@ public class OpaAccessControlUnitTest
     {
         mockClient.setHandler((request) -> failureResponse);
 
-        Throwable actualError = assertThrows(expectedException, () -> method.accept(authorizer, requestingSecurityContext, new CatalogSchemaName("dummy-catalog", "dummy-schema")));
+        Throwable actualError = assertThrows(
+                expectedException,
+                () -> method.accept(
+                        authorizer,
+                        requestingSecurityContext,
+                        new CatalogSchemaName("dummy-catalog", "dummy-schema")));
         assertTrue(actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
     }
@@ -534,7 +568,12 @@ public class OpaAccessControlUnitTest
     {
         mockClient.setHandler((request) -> failureResponse);
 
-        Throwable actualError = assertThrows(expectedException, () -> authorizer.checkCanCreateSchema(requestingSecurityContext, new CatalogSchemaName("some-catalog", "some-schema"), Map.of()));
+        Throwable actualError = assertThrows(
+                expectedException,
+                () -> authorizer.checkCanCreateSchema(
+                        requestingSecurityContext,
+                        new CatalogSchemaName("some-catalog", "some-schema"),
+                        Map.of()));
         assertTrue(actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
     }
@@ -574,7 +613,12 @@ public class OpaAccessControlUnitTest
     {
         mockClient.setHandler((request) -> failureResponse);
 
-        Throwable actualError = assertThrows(expectedException, () -> authorizer.checkCanRenameSchema(requestingSecurityContext, new CatalogSchemaName("some-catalog", "some-schema"), "new-name"));
+        Throwable actualError = assertThrows(
+                expectedException,
+                () -> authorizer.checkCanRenameSchema(
+                        requestingSecurityContext,
+                        new CatalogSchemaName("some-catalog", "some-schema"),
+                        "new-name"));
         assertTrue(actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
     }
@@ -643,7 +687,13 @@ public class OpaAccessControlUnitTest
 
         CatalogSchemaTableName sourceTable = new CatalogSchemaTableName("some-catalog", "some-schema", "some-table");
         CatalogSchemaTableName targetTable = new CatalogSchemaTableName("another-catalog", "another-schema", "another-table");
-        Throwable actualError = assertThrows(expectedException, () -> method.accept(authorizer, requestingSecurityContext, sourceTable, targetTable));
+        Throwable actualError = assertThrows(
+                expectedException,
+                () -> method.accept(
+                        authorizer,
+                        requestingSecurityContext,
+                        sourceTable,
+                        targetTable));
         assertTrue(actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
     }
@@ -687,7 +737,12 @@ public class OpaAccessControlUnitTest
         mockClient.setHandler((request) -> failureResponse);
 
         CatalogSchemaName schema = new CatalogSchemaName("some-catalog", "some-schema");
-        Throwable actualError = assertThrows(expectedException, () -> authorizer.checkCanSetSchemaAuthorization(requestingSecurityContext, schema, new TrinoPrincipal(PrincipalType.USER, "some-user")));
+        Throwable actualError = assertThrows(
+                expectedException,
+                () -> authorizer.checkCanSetSchemaAuthorization(
+                        requestingSecurityContext,
+                        schema,
+                        new TrinoPrincipal(PrincipalType.USER, "some-user")));
         assertTrue(actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
     }
@@ -756,7 +811,11 @@ public class OpaAccessControlUnitTest
 
         Throwable actualError = assertThrows(
                 expectedException,
-                () -> method.accept(authorizer, requestingSecurityContext, table, new TrinoPrincipal(PrincipalType.USER, "some-user")));
+                () -> method.accept(
+                        authorizer,
+                        requestingSecurityContext,
+                        table,
+                        new TrinoPrincipal(PrincipalType.USER, "some-user")));
         assertTrue(actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
     }
@@ -830,7 +889,11 @@ public class OpaAccessControlUnitTest
     @Test
     public void testCanGrantExecuteFunctionPrivilege()
     {
-        authorizer.checkCanGrantExecuteFunctionPrivilege(requestingSecurityContext, "some-function", new TrinoPrincipal(PrincipalType.USER, "some-user"), true);
+        authorizer.checkCanGrantExecuteFunctionPrivilege(
+                requestingSecurityContext,
+                "some-function",
+                new TrinoPrincipal(PrincipalType.USER, "some-user"),
+                true);
 
         String expectedRequest = """
                 {
@@ -865,7 +928,11 @@ public class OpaAccessControlUnitTest
 
         Throwable actualError = assertThrows(
                 expectedException,
-                () -> authorizer.checkCanGrantExecuteFunctionPrivilege(requestingSecurityContext, "some-function", new TrinoPrincipal(PrincipalType.USER, "some-name"), true));
+                () -> authorizer.checkCanGrantExecuteFunctionPrivilege(
+                        requestingSecurityContext,
+                        "some-function",
+                        new TrinoPrincipal(PrincipalType.USER, "some-name"),
+                        true));
         assertTrue(
                 actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
@@ -874,7 +941,8 @@ public class OpaAccessControlUnitTest
     @Test
     public void testCanSetCatalogSessionProperty()
     {
-        authorizer.checkCanSetCatalogSessionProperty(requestingSecurityContext, "some-catalog", "some-property");
+        authorizer.checkCanSetCatalogSessionProperty(
+                requestingSecurityContext, "some-catalog", "some-property");
 
         String expectedRequest = """
                 {
@@ -903,7 +971,10 @@ public class OpaAccessControlUnitTest
 
         Throwable actualError = assertThrows(
                 expectedException,
-                () -> authorizer.checkCanSetCatalogSessionProperty(requestingSecurityContext, "some-catalog", "some-property"));
+                () -> authorizer.checkCanSetCatalogSessionProperty(
+                        requestingSecurityContext,
+                        "some-catalog",
+                        "some-property"));
         assertTrue(
                 actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
@@ -913,8 +984,10 @@ public class OpaAccessControlUnitTest
     {
         Stream<FunctionalHelpers.Consumer5<OpaAccessControl, SystemSecurityContext, Privilege, CatalogSchemaName, TrinoPrincipal>> methods = Stream.of(
                 OpaAccessControl::checkCanDenySchemaPrivilege,
-                (authorizer, context, privilege, catalog, principal) -> authorizer.checkCanGrantSchemaPrivilege(context, privilege, catalog, principal, true),
-                (authorizer, context, privilege, catalog, principal) -> authorizer.checkCanRevokeSchemaPrivilege(context, privilege, catalog, principal, true));
+                (authorizer, context, privilege, catalog, principal) -> authorizer.checkCanGrantSchemaPrivilege(
+                        context, privilege, catalog, principal, true),
+                (authorizer, context, privilege, catalog, principal) -> authorizer.checkCanRevokeSchemaPrivilege(
+                        context, privilege, catalog, principal, true));
         Stream<String> actions = Stream.of(
                 "DenySchemaPrivilege",
                 "GrantSchemaPrivilege",
@@ -930,7 +1003,12 @@ public class OpaAccessControlUnitTest
             throws IOException
     {
         Privilege privilege = Privilege.CREATE;
-        method.accept(authorizer, requestingSecurityContext, privilege, new CatalogSchemaName("some-catalog", "some-schema"), new TrinoPrincipal(PrincipalType.USER, "some-user"));
+        method.accept(
+                authorizer,
+                requestingSecurityContext,
+                privilege,
+                new CatalogSchemaName("some-catalog", "some-schema"),
+                new TrinoPrincipal(PrincipalType.USER, "some-user"));
 
         String expectedRequest = """
                 {
@@ -983,7 +1061,12 @@ public class OpaAccessControlUnitTest
         Privilege privilege = Privilege.CREATE;
         Throwable actualError = assertThrows(
                 expectedException,
-                () -> method.accept(authorizer, requestingSecurityContext, privilege, new CatalogSchemaName("some-catalog", "some-schema"), new TrinoPrincipal(PrincipalType.USER, "some-user")));
+                () -> method.accept(
+                        authorizer,
+                        requestingSecurityContext,
+                        privilege,
+                        new CatalogSchemaName("some-catalog", "some-schema"),
+                        new TrinoPrincipal(PrincipalType.USER, "some-user")));
         assertTrue(
                 actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
@@ -1010,7 +1093,12 @@ public class OpaAccessControlUnitTest
             throws IOException
     {
         Privilege privilege = Privilege.CREATE;
-        method.accept(authorizer, requestingSecurityContext, privilege, new CatalogSchemaTableName("some-catalog", "some-schema", "some-table"), new TrinoPrincipal(PrincipalType.USER, "some-user"));
+        method.accept(
+                authorizer,
+                requestingSecurityContext,
+                privilege,
+                new CatalogSchemaTableName("some-catalog", "some-schema", "some-table"),
+                new TrinoPrincipal(PrincipalType.USER, "some-user"));
 
         String expectedRequest = """
                 {
@@ -1064,7 +1152,12 @@ public class OpaAccessControlUnitTest
         Privilege privilege = Privilege.CREATE;
         Throwable actualError = assertThrows(
                 expectedException,
-                () -> method.accept(authorizer, requestingSecurityContext, privilege, new CatalogSchemaTableName("some-catalog", "some-schema", "some-table"), new TrinoPrincipal(PrincipalType.USER, "some-user")));
+                () -> method.accept(
+                        authorizer,
+                        requestingSecurityContext,
+                        privilege,
+                        new CatalogSchemaTableName("some-catalog", "some-schema", "some-table"),
+                        new TrinoPrincipal(PrincipalType.USER, "some-user")));
         assertTrue(
                 actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
@@ -1115,7 +1208,10 @@ public class OpaAccessControlUnitTest
 
         Throwable actualError = assertThrows(
                 expectedException,
-                () -> authorizer.checkCanCreateRole(requestingSecurityContext, "some-role-without-grantor", Optional.empty()));
+                () -> authorizer.checkCanCreateRole(
+                        requestingSecurityContext,
+                        "some-role-without-grantor",
+                        Optional.empty()));
         assertTrue(
                 actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
@@ -1211,7 +1307,13 @@ public class OpaAccessControlUnitTest
         TrinoPrincipal grantee = new TrinoPrincipal(PrincipalType.ROLE, "some-grantee-role");
         Throwable actualError = assertThrows(
                 expectedException,
-                () -> method.accept(authorizer, requestingSecurityContext, Set.of("some-role-without-grantor"), Set.of(grantee), true, Optional.empty()));
+                () -> method.accept(
+                        authorizer,
+                        requestingSecurityContext,
+                        Set.of("some-role-without-grantor"),
+                        Set.of(grantee),
+                        true,
+                        Optional.empty()));
         assertTrue(
                 actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
@@ -1251,7 +1353,9 @@ public class OpaAccessControlUnitTest
         CatalogSchemaRoutineName routine = new CatalogSchemaRoutineName("some-catalog", "some-schema", "some-routine-name");
         Throwable actualError = assertThrows(
                 expectedException,
-                () -> authorizer.checkCanExecuteProcedure(requestingSecurityContext, routine));
+                () -> authorizer.checkCanExecuteProcedure(
+                        requestingSecurityContext,
+                        routine));
         assertTrue(
                 actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
@@ -1292,7 +1396,10 @@ public class OpaAccessControlUnitTest
         CatalogSchemaTableName table = new CatalogSchemaTableName("some-catalog", "some-schema", "some-table");
         Throwable actualError = assertThrows(
                 expectedException,
-                () -> authorizer.checkCanExecuteTableProcedure(requestingSecurityContext, table, "some-procedure"));
+                () -> authorizer.checkCanExecuteTableProcedure(
+                        requestingSecurityContext,
+                        table,
+                        "some-procedure"));
         assertTrue(
                 actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
@@ -1333,7 +1440,10 @@ public class OpaAccessControlUnitTest
         CatalogSchemaRoutineName routine = new CatalogSchemaRoutineName("some-catalog", "some-schema", "some-routine");
         Throwable actualError = assertThrows(
                 expectedException,
-                () -> authorizer.checkCanExecuteFunction(requestingSecurityContext, FunctionKind.AGGREGATE, routine));
+                () -> authorizer.checkCanExecuteFunction(
+                        requestingSecurityContext,
+                        FunctionKind.AGGREGATE,
+                        routine));
         assertTrue(
                 actualError.getMessage().contains(expectedErrorMessage),
                 String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
