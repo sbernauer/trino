@@ -14,7 +14,6 @@
 package io.trino.plugin.openpolicyagent.schema;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import com.google.common.collect.ImmutableSet;
 import io.trino.spi.connector.CatalogSchemaTableName;
@@ -22,55 +21,19 @@ import io.trino.spi.connector.CatalogSchemaTableName;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNullElse;
 
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
-public record TrinoTable(@JsonUnwrapped TrinoSchema catalogSchema, String tableName,
-                         @JsonInclude(JsonInclude.Include.NON_ABSENT) Map<String, Object> properties,
+public record TrinoTable(@JsonUnwrapped TrinoSchema catalogSchema,
+                         String tableName,
                          Set<String> columns)
 {
     public static class Builder
+            extends BaseSchemaBuilder<TrinoTable, Builder>
     {
-        public String catalogName;
-        public String schemaName;
         public String tableName;
-        public Map<String, Object> properties;
         public Set<String> columns;
-
-        public Builder catalogName(String catalogName)
-        {
-            this.catalogName = catalogName;
-            return this;
-        }
-
-        public Builder schemaName(String schemaName)
-        {
-            this.schemaName = schemaName;
-            return this;
-        }
-
-        private <T> Builder propertiesWithGetter(
-                Map<String, T> properties,
-                Function<T, Optional<Object>> optionalBuilder)
-        {
-            // https://openjdk.org/jeps/269
-            // ImmutableMap along with other new collections does not support null
-            // cast nulls to empty optionals
-            this.properties = properties
-                    .entrySet()
-                    .stream()
-                    .map((e) -> Map.entry(e.getKey(), optionalBuilder.apply(e.getValue())))
-                    .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
-            return this;
-        }
-
-        public Builder properties(Map<String, Object> properties)
-        {
-            return propertiesWithGetter(properties, Optional::ofNullable);
-        }
 
         public Builder optionalProperties(Map<String, Optional<Object>> properties)
         {
@@ -97,6 +60,7 @@ public record TrinoTable(@JsonUnwrapped TrinoSchema catalogSchema, String tableN
                     .tableName(table.getSchemaTableName().getTableName());
         }
 
+        @Override
         public TrinoTable build()
         {
             return new TrinoTable(this);
@@ -105,12 +69,7 @@ public record TrinoTable(@JsonUnwrapped TrinoSchema catalogSchema, String tableN
 
     public TrinoTable(Builder builder)
     {
-        this(
-                new TrinoSchema.Builder()
-                        .catalogName(builder.catalogName)
-                        .schemaName(builder.schemaName)
-                        .build(),
-                builder.tableName, builder.properties, builder.columns);
+        this(new TrinoSchema(builder), builder.tableName, builder.columns);
     }
 
     public static TrinoTable fromTrinoTable(CatalogSchemaTableName table)

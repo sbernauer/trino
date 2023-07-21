@@ -19,44 +19,15 @@ import io.trino.spi.connector.CatalogSchemaName;
 
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
-// TODO (PABLO) Try to abstract to a generic class shared with TrinoTable
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
-public record TrinoSchema(String catalogName, String schemaName,
-                          @JsonInclude(JsonInclude.Include.NON_ABSENT) Map<String, Object> properties)
+public record TrinoSchema(String catalogName,
+                          String schemaName,
+                          @JsonInclude(value = JsonInclude.Include.NON_NULL) Map<String, Optional<Object>> properties)
 {
     public static class Builder
+            extends BaseSchemaBuilder<TrinoSchema, Builder>
     {
-        public String catalogName;
-        public String schemaName;
-        public Map<String, Object> properties;
-
-        public Builder catalogName(String catalogName)
-        {
-            this.catalogName = catalogName;
-            return this;
-        }
-
-        public Builder schemaName(String schemaName)
-        {
-            this.schemaName = schemaName;
-            return this;
-        }
-
-        public Builder properties(Map<String, Object> properties)
-        {
-            // https://openjdk.org/jeps/269
-            // ImmutableMap along with other new collections does not support null
-            // cast nulls to empty optionals
-            this.properties = properties
-                    .entrySet()
-                    .stream()
-                    .map((e) -> Map.entry(e.getKey(), Optional.ofNullable(e.getValue())))
-                    .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
-            return this;
-        }
-
         public static Builder fromTrinoCatalogSchema(CatalogSchemaName catalogSchemaName)
         {
             return new Builder()
@@ -64,6 +35,7 @@ public record TrinoSchema(String catalogName, String schemaName,
                     .schemaName(catalogSchemaName.getSchemaName());
         }
 
+        @Override
         public TrinoSchema build()
         {
             return new TrinoSchema(this);
@@ -75,7 +47,7 @@ public record TrinoSchema(String catalogName, String schemaName,
         return Builder.fromTrinoCatalogSchema(catalogSchemaName).build();
     }
 
-    public TrinoSchema(Builder builder)
+    public <T extends BaseSchemaBuilder<?, T>> TrinoSchema(T builder)
     {
         this(builder.catalogName, builder.schemaName, builder.properties);
     }
