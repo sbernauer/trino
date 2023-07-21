@@ -16,6 +16,7 @@ package io.trino.plugin.openpolicyagent;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Injector;
 import com.google.inject.Key;
+import com.google.inject.Scopes;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.http.client.HttpClient;
 import io.airlift.json.JsonModule;
@@ -62,6 +63,7 @@ public class OpaAccessControlFactory
                     else {
                         binder.bind(Key.get(HttpClient.class, ForOpa.class)).toInstance(httpClient.orElseThrow());
                     }
+                    binder.bind(OpaHttpClient.class).in(Scopes.SINGLETON);
                 },
                 new OpaAccessControlModule());
 

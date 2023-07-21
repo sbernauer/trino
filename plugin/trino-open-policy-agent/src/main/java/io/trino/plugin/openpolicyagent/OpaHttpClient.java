@@ -16,6 +16,7 @@ package io.trino.plugin.openpolicyagent;
 import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.inject.Inject;
 import io.airlift.concurrent.BoundedExecutor;
 import io.airlift.http.client.FullJsonResponseHandler;
 import io.airlift.http.client.HttpClient;
@@ -51,7 +52,8 @@ public class OpaHttpClient
     private final JsonCodec<OpaQuery> serializer;
     private final Executor executor;
 
-    public OpaHttpClient(HttpClient httpClient, JsonCodec<OpaQuery> serializer)
+    @Inject
+    public OpaHttpClient(@ForOpa HttpClient httpClient, JsonCodec<OpaQuery> serializer)
     {
         this.httpClient = httpClient;
         this.serializer = serializer;

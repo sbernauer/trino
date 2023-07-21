@@ -16,10 +16,8 @@ package io.trino.plugin.openpolicyagent;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
-import io.airlift.http.client.HttpClient;
 import io.airlift.json.JsonCodec;
 import io.trino.plugin.openpolicyagent.schema.OpaBatchQueryResult;
-import io.trino.plugin.openpolicyagent.schema.OpaQuery;
 import io.trino.plugin.openpolicyagent.schema.OpaQueryContext;
 import io.trino.plugin.openpolicyagent.schema.OpaQueryInput;
 import io.trino.plugin.openpolicyagent.schema.OpaQueryInputAction;
@@ -52,13 +50,12 @@ public class OpaBatchAccessControl
 
     @Inject
     public OpaBatchAccessControl(
-            JsonCodec<OpaQuery> queryCodec,
             JsonCodec<OpaQueryResult> queryResultCodec,
             JsonCodec<OpaBatchQueryResult> batchResultCodec,
-            @ForOpa HttpClient httpClient,
+            OpaHttpClient httpClient,
             OpaConfig config)
     {
-        super(queryCodec, queryResultCodec, httpClient, config);
+        super(queryResultCodec, httpClient, config);
         this.opaBatchedPolicyUri = config.getOpaBatchUri().orElseThrow();
         this.batchResultCodec = batchResultCodec;
     }

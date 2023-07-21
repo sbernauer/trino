@@ -15,9 +15,7 @@ package io.trino.plugin.openpolicyagent;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
-import io.airlift.http.client.HttpClient;
 import io.airlift.json.JsonCodec;
-import io.trino.plugin.openpolicyagent.schema.OpaQuery;
 import io.trino.plugin.openpolicyagent.schema.OpaQueryContext;
 import io.trino.plugin.openpolicyagent.schema.OpaQueryInput;
 import io.trino.plugin.openpolicyagent.schema.OpaQueryInputAction;
@@ -122,13 +120,12 @@ public class OpaAccessControl
 
     @Inject
     public OpaAccessControl(
-            JsonCodec<OpaQuery> queryCodec,
             JsonCodec<OpaQueryResult> queryResultCodec,
-            @ForOpa HttpClient httpClient,
+            OpaHttpClient httpClient,
             OpaConfig config)
     {
         this.opaPolicyUri = config.getOpaUri();
-        this.opaHttpClient = new OpaHttpClient(httpClient, queryCodec);
+        this.opaHttpClient = httpClient;
         this.queryResultCodec = queryResultCodec;
     }
 
