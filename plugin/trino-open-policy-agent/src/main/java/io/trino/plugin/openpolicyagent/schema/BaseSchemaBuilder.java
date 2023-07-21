@@ -24,16 +24,18 @@ public abstract class BaseSchemaBuilder<T, B extends BaseSchemaBuilder<T, B>>
     public String schemaName;
     public Map<String, Optional<Object>> properties;
 
+    protected abstract B getInstance();
+
     public B catalogName(String catalogName)
     {
         this.catalogName = catalogName;
-        return (B) this;
+        return getInstance();
     }
 
     public B schemaName(String schemaName)
     {
         this.schemaName = schemaName;
-        return (B) this;
+        return getInstance();
     }
 
     public B properties(Map<String, Object> properties)
@@ -53,7 +55,7 @@ public abstract class BaseSchemaBuilder<T, B extends BaseSchemaBuilder<T, B>>
                 .stream()
                 .map((e) -> Map.entry(e.getKey(), optionalBuilder.apply(e.getValue())))
                 .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
-        return (B) this;
+        return getInstance();
     }
 
     public abstract T build();

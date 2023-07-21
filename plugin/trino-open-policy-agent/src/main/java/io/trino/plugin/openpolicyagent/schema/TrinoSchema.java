@@ -28,6 +28,11 @@ public record TrinoSchema(String catalogName,
     public static class Builder
             extends BaseSchemaBuilder<TrinoSchema, Builder>
     {
+        protected Builder getInstance()
+        {
+            return this;
+        }
+
         public static Builder fromTrinoCatalogSchema(CatalogSchemaName catalogSchemaName)
         {
             return new Builder()

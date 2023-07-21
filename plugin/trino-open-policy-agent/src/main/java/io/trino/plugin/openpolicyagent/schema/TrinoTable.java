@@ -35,6 +35,11 @@ public record TrinoTable(@JsonUnwrapped TrinoSchema catalogSchema,
         public String tableName;
         public Set<String> columns;
 
+        protected Builder getInstance()
+        {
+            return this;
+        }
+
         public Builder optionalProperties(Map<String, Optional<Object>> properties)
         {
             return propertiesWithGetter(properties, (i) -> requireNonNullElse(i, Optional.empty()));
