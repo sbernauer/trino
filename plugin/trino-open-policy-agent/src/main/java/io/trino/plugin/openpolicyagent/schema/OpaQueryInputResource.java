@@ -16,7 +16,8 @@ package io.trino.plugin.openpolicyagent.schema;
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 
 import java.util.Set;
-import java.util.stream.Collectors;
+
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
 public class OpaQueryInputResource
@@ -104,7 +105,7 @@ public class OpaQueryInputResource
 
         public Builder roles(Set<String> roles)
         {
-            this.roles = roles.stream().map(NamedEntity::new).collect(Collectors.toSet());
+            this.roles = roles.stream().map(NamedEntity::new).collect(toImmutableSet());
             return this;
         }
 

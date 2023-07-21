@@ -35,6 +35,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.net.HttpHeaders.CONTENT_TYPE;
 import static com.google.common.net.MediaType.JSON_UTF_8;
@@ -113,7 +114,7 @@ public class OpaHttpClient
                 .stream()
                 .map((item) -> submitOpaRequest(requestBuilder.apply(item), uri, deserializer)
                         .transform((result) -> result.result() ? Optional.of(item) : Optional.<T>empty(), executor))
-                .toList();
+                .collect(toImmutableList());
         return propagatingConsumeFuture(
                 Futures.whenAllComplete(allFutures).call(() ->
                                 allFutures

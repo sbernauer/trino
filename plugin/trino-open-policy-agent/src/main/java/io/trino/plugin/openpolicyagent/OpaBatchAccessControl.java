@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 
+import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.trino.plugin.openpolicyagent.OpaHttpClient.propagatingConsumeFuture;
 import static java.util.Objects.requireNonNull;
@@ -86,7 +87,7 @@ public class OpaBatchAccessControl
 
     private <T> Function<List<T>, List<OpaQueryInputResource>> mapItemToResource(Function<T, OpaQueryInputResource> converter)
     {
-        return (s) -> s.stream().map(converter).toList();
+        return (s) -> s.stream().map(converter).collect(toImmutableList());
     }
 
     @Override
