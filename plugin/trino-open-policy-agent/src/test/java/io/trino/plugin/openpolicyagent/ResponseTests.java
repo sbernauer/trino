@@ -15,6 +15,8 @@ package io.trino.plugin.openpolicyagent;
 
 import io.airlift.json.JsonCodec;
 import io.airlift.json.JsonCodecFactory;
+import io.trino.plugin.openpolicyagent.schema.OpaBatchQueryResult;
+import io.trino.plugin.openpolicyagent.schema.OpaQueryResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;

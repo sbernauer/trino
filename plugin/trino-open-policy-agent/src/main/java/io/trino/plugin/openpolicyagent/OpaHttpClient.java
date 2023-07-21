@@ -22,6 +22,9 @@ import io.airlift.http.client.HttpClient;
 import io.airlift.http.client.HttpStatus;
 import io.airlift.http.client.Request;
 import io.airlift.json.JsonCodec;
+import io.trino.plugin.openpolicyagent.schema.OpaQuery;
+import io.trino.plugin.openpolicyagent.schema.OpaQueryInput;
+import io.trino.plugin.openpolicyagent.schema.OpaQueryResult;
 
 import java.net.URI;
 import java.util.Collection;

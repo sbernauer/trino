@@ -11,28 +11,43 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.trino.plugin.openpolicyagent;
+package io.trino.plugin.openpolicyagent.schema;
 
 import io.trino.spi.security.Identity;
 import io.trino.spi.security.SelectedRole;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
-public record OpaIdentity(
+public record TrinoIdentity(
         String user,
         Set<String> groups,
         Set<String> enabledRoles,
-        Map<String, SelectedRole> catalogRoles,
+        Map<String, OpaSelectedRole> catalogRoles,
         Map<String, String> extraCredentials)
 {
-    public static OpaIdentity fromTrinoIdentity(Identity identity)
+    public static TrinoIdentity fromTrinoIdentity(Identity identity)
     {
-        return new OpaIdentity(
+        return new TrinoIdentity(
                 identity.getUser(),
                 identity.getGroups(),
                 identity.getEnabledRoles(),
-                identity.getCatalogRoles(),
+                identity
+                        .getCatalogRoles()
+                        .entrySet()
+                        .stream()
+                        .map((entry) -> Map.entry(
+                                entry.getKey(), OpaSelectedRole.fromTrinoSelectedRole(entry.getValue())))
+                        .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue)),
                 identity.getExtraCredentials());
+    }
+
+    public record OpaSelectedRole(String type, String role)
+    {
+        public static OpaSelectedRole fromTrinoSelectedRole(SelectedRole role)
+        {
+            return new OpaSelectedRole(role.getType().name(), role.getRole().orElse(null));
+        }
     }
 }

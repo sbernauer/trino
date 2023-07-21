@@ -19,6 +19,8 @@ import com.google.inject.Key;
 import io.airlift.bootstrap.Bootstrap;
 import io.airlift.http.client.HttpClient;
 import io.airlift.json.JsonModule;
+import io.trino.plugin.openpolicyagent.schema.OpaQuery;
+import io.trino.plugin.openpolicyagent.schema.OpaQueryResult;
 import io.trino.spi.security.SystemAccessControl;
 import io.trino.spi.security.SystemAccessControlFactory;
 

@@ -18,6 +18,16 @@ import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
 import io.airlift.http.client.HttpClient;
 import io.airlift.json.JsonCodec;
+import io.trino.plugin.openpolicyagent.schema.OpaBatchQueryResult;
+import io.trino.plugin.openpolicyagent.schema.OpaQuery;
+import io.trino.plugin.openpolicyagent.schema.OpaQueryContext;
+import io.trino.plugin.openpolicyagent.schema.OpaQueryInput;
+import io.trino.plugin.openpolicyagent.schema.OpaQueryInputAction;
+import io.trino.plugin.openpolicyagent.schema.OpaQueryInputResource;
+import io.trino.plugin.openpolicyagent.schema.OpaQueryResult;
+import io.trino.plugin.openpolicyagent.schema.TrinoSchema;
+import io.trino.plugin.openpolicyagent.schema.TrinoTable;
+import io.trino.plugin.openpolicyagent.schema.TrinoUser;
 import io.trino.spi.connector.CatalogSchemaTableName;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.security.Identity;
@@ -88,7 +98,7 @@ public class OpaBatchAccessControl
                 queryOwners,
                 mapItemToResource((item) -> new OpaQueryInputResource
                         .Builder()
-                        .user(new OpaQueryInputResource.User(item))
+                        .user(new TrinoUser(item))
                         .build()));
     }
 
@@ -116,7 +126,11 @@ public class OpaBatchAccessControl
                 mapItemToResource(
                         (i) -> new OpaQueryInputResource
                                 .Builder()
-                                .schema(new OpaQueryInputResource.CatalogSchema(catalogName, i))
+                                .schema(new TrinoSchema
+                                        .Builder()
+                                        .catalogName(catalogName)
+                                        .schemaName(i)
+                                        .build())
                                 .build()));
     }
 
@@ -130,7 +144,12 @@ public class OpaBatchAccessControl
                 mapItemToResource(
                         (i) -> new OpaQueryInputResource
                                 .Builder()
-                                .table(new OpaQueryInputResource.Table(catalogName, i.getSchemaName(), i.getTableName()))
+                                .table(new TrinoTable
+                                        .Builder()
+                                        .catalogName(catalogName)
+                                        .schemaName(i.getSchemaName())
+                                        .tableName(i.getTableName())
+                                        .build())
                                 .build()));
     }
 
@@ -143,7 +162,11 @@ public class OpaBatchAccessControl
                 columns,
                 (s) -> List.of(new OpaQueryInputResource
                         .Builder()
-                        .table(new OpaQueryInputResource.Table(table, ImmutableSet.copyOf(s)))
+                        .table(TrinoTable
+                                .Builder
+                                .fromTrinoTable(table)
+                                .columns(ImmutableSet.copyOf(s))
+                                .build())
                         .build()));
     }
 }

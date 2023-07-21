@@ -11,20 +11,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.trino.plugin.openpolicyagent;
+package io.trino.plugin.openpolicyagent.schema;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.google.common.collect.ImmutableSet;
 import io.trino.spi.security.Privilege;
-import io.trino.spi.security.TrinoPrincipal;
 
 import java.util.Set;
 
 @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
 public class OpaQueryInputGrant
 {
-    public Set<TrinoPrincipal> principals;
+    public Set<TrinoGrantPrincipal> principals;
     public Boolean grantOption;
-    public Privilege privilege;
+    public String privilege;
 
     private OpaQueryInputGrant(Builder builder)
     {
@@ -35,19 +35,19 @@ public class OpaQueryInputGrant
 
     public static class Builder
     {
-        private Set<TrinoPrincipal> principals;
+        private Set<TrinoGrantPrincipal> principals;
         private Boolean grantOption;
-        private Privilege privilege;
+        private String privilege;
 
-        public Builder principal(TrinoPrincipal principal)
+        public Builder principal(TrinoGrantPrincipal principal)
         {
-            this.principals = Set.of(principal);
+            this.principals = ImmutableSet.of(principal);
             return this;
         }
 
-        public Builder principals(Set<TrinoPrincipal> principals)
+        public Builder principals(Set<TrinoGrantPrincipal> principals)
         {
-            this.principals = Set.copyOf(principals);
+            this.principals = ImmutableSet.copyOf(principals);
             return this;
         }
 
@@ -59,7 +59,7 @@ public class OpaQueryInputGrant
 
         public Builder privilege(Privilege privilege)
         {
-            this.privilege = privilege;
+            this.privilege = privilege.name();
             return this;
         }
 

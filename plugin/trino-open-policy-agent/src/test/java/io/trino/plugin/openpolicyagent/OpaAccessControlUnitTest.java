@@ -36,6 +36,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -253,10 +254,14 @@ public class OpaAccessControlUnitTest
             FunctionalHelpers.Consumer4<OpaAccessControl, SystemSecurityContext, CatalogSchemaTableName, Map> callable)
     {
         CatalogSchemaTableName table = new CatalogSchemaTableName("my-catalog", "my-schema", "my-table");
-        Map<String, Optional<Object>> properties = Map.of(
-                "string-item", Optional.of("string-value"),
-                "empty-item", Optional.empty(),
-                "boxed-number-item", Optional.of(Integer.valueOf(32)));
+        Map<String, Optional<Object>> properties = new HashMap<>();
+        properties.put("string-item", Optional.of("string-value"));
+        // https://openjdk.org/jeps/269
+        // New collections do not support null items in them, so we need to ensure
+        // our code will use a Map that can deal with nulls
+        properties.put("empty-item", Optional.empty());
+        properties.put("null-item", null);
+        properties.put("boxed-number-item", Optional.of(Integer.valueOf(32)));
 
         callable.accept(authorizer, requestingSecurityContext, table, properties);
 
@@ -271,6 +276,7 @@ public class OpaAccessControlUnitTest
                             "properties": {
                                 "string-item": "string-value",
                                 "empty-item": null,
+                                "null-item": null,
                                 "boxed-number-item": 32
                             }
                         }

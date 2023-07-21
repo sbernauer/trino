@@ -11,6 +11,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.trino.plugin.openpolicyagent;
+package io.trino.plugin.openpolicyagent.schema;
 
-public record OpaQuery(OpaQueryInput input) {}
+import io.trino.spi.security.SystemSecurityContext;
+
+public record OpaQueryContext(TrinoIdentity identity)
+{
+    public static OpaQueryContext fromSystemSecurityContext(SystemSecurityContext ctx)
+    {
+        return new OpaQueryContext(TrinoIdentity.fromTrinoIdentity(ctx.getIdentity()));
+    }
+}

@@ -11,10 +11,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.trino.plugin.openpolicyagent;
+package io.trino.plugin.openpolicyagent.schema;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import io.trino.spi.security.TrinoPrincipal;
 
 import java.util.Collection;
 import java.util.List;
@@ -27,7 +26,7 @@ public class OpaQueryInputAction
     public final List<OpaQueryInputResource> filterResources;
     public final OpaQueryInputResource targetResource;
     public final OpaQueryInputGrant grantee;
-    public final TrinoPrincipal grantor;
+    public final TrinoGrantPrincipal grantor;
 
     private OpaQueryInputAction(OpaQueryInputAction.Builder builder)
     {
@@ -49,7 +48,7 @@ public class OpaQueryInputAction
         private List<OpaQueryInputResource> filterResources;
         private OpaQueryInputResource targetResource;
         private OpaQueryInputGrant grantee;
-        private TrinoPrincipal grantor;
+        private TrinoGrantPrincipal grantor;
 
         public Builder operation(String operation)
         {
@@ -81,7 +80,7 @@ public class OpaQueryInputAction
             return this;
         }
 
-        public Builder grantor(TrinoPrincipal grantor)
+        public Builder grantor(TrinoGrantPrincipal grantor)
         {
             this.grantor = grantor;
             return this;

@@ -15,8 +15,7 @@ package io.trino.plugin.openpolicyagent;
 
 import io.airlift.configuration.Config;
 import io.airlift.configuration.ConfigDescription;
-
-import javax.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotNull;
 
 import java.net.URI;
 import java.util.Optional;
@@ -24,11 +23,12 @@ import java.util.Optional;
 public class OpaConfig
 {
     private URI opaUri;
-    private URI opaBatchUri;
+
+    private Optional<URI> opaBatchUri = Optional.empty();
 
     @Config("opa.policy.uri")
     @ConfigDescription("URI for OPA policies")
-    public OpaConfig setOpaUri(URI opaUri)
+    public OpaConfig setOpaUri(@NotNull URI opaUri)
     {
         this.opaUri = opaUri;
         return this;
@@ -38,7 +38,7 @@ public class OpaConfig
     @ConfigDescription("URI for Batch OPA policies - if not set, a single request will be sent for each entry on filtering methods")
     public OpaConfig setOpaBatchUri(URI opaBatchUri)
     {
-        this.opaBatchUri = opaBatchUri;
+        this.opaBatchUri = Optional.ofNullable(opaBatchUri);
         return this;
     }
 
@@ -50,6 +50,6 @@ public class OpaConfig
 
     public Optional<URI> getOpaBatchUri()
     {
-        return Optional.ofNullable(opaBatchUri);
+        return opaBatchUri;
     }
 }

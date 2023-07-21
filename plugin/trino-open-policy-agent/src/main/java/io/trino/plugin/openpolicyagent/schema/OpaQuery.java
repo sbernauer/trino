@@ -11,19 +11,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.trino.plugin.openpolicyagent;
+package io.trino.plugin.openpolicyagent.schema;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-
-import javax.validation.constraints.NotNull;
-
-import static java.util.Objects.requireNonNullElse;
-
-public record OpaQueryResult(@JsonProperty("decision_id") String decisionId, Boolean result)
-{
-    @Override
-    public @NotNull Boolean result()
-    {
-        return requireNonNullElse(this.result, false);
-    }
-}
+public record OpaQuery(OpaQueryInput input) {}

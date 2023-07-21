@@ -11,14 +11,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.trino.plugin.openpolicyagent;
+package io.trino.plugin.openpolicyagent.schema;
 
-import io.trino.spi.security.SystemSecurityContext;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.NotNull;
 
-public record OpaQueryContext(OpaIdentity identity)
+import static java.util.Objects.requireNonNullElse;
+
+public record OpaQueryResult(@JsonProperty("decision_id") String decisionId, Boolean result)
 {
-    public static OpaQueryContext fromSystemSecurityContext(SystemSecurityContext ctx)
+    @Override
+    public @NotNull Boolean result()
     {
-        return new OpaQueryContext(OpaIdentity.fromTrinoIdentity(ctx.getIdentity()));
+        return requireNonNullElse(this.result, false);
     }
 }

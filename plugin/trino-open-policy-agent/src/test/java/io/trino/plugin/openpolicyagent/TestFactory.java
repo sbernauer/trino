@@ -55,4 +55,14 @@ public class TestFactory
                 () -> factory.create(Map.of()),
                 "may not be null");
     }
+
+    @Test
+    public void testConfigMayNotBeNull()
+    {
+        OpaAccessControlFactory factory = new OpaAccessControlFactory();
+
+        assertThrows(
+                NullPointerException.class,
+                () -> factory.create(null));
+    }
 }

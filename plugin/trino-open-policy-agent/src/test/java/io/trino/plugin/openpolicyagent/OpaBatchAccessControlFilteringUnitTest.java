@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
+import io.trino.plugin.openpolicyagent.schema.TrinoUser;
 import io.trino.spi.connector.CatalogSchemaTableName;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.security.Identity;
@@ -131,7 +132,7 @@ public class OpaBatchAccessControlFilteringUnitTest
 
         ArrayNode allExpectedUsers = jsonMapper.createArrayNode().addAll(
                 requestedIdentities.stream()
-                        .map(OpaQueryInputResource.User::new)
+                        .map(TrinoUser::new)
                         .map((i) -> encodeObjectWithKey(i, "user"))
                         .toList());
         ObjectNode expectedRequest = jsonMapper.createObjectNode()

@@ -11,7 +11,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.trino.plugin.openpolicyagent;
+package io.trino.plugin.openpolicyagent.schema;
 
-public record OpaQueryInput(OpaQueryContext context, OpaQueryInputAction action)
-{ }
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonUnwrapped;
+import io.trino.spi.security.Identity;
+
+@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+public record TrinoUser(String name, @JsonUnwrapped TrinoIdentity identity)
+{
+    public TrinoUser(String name)
+    {
+        this(name, null);
+    }
+
+    public TrinoUser(Identity identity)
+    {
+        this(identity.getUser(), TrinoIdentity.fromTrinoIdentity(identity));
+    }
+}

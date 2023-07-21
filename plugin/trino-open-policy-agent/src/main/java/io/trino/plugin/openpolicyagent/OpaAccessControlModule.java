@@ -17,6 +17,7 @@ import com.google.inject.Binder;
 import com.google.inject.Key;
 import com.google.inject.Scopes;
 import io.airlift.configuration.AbstractConfigurationAwareModule;
+import io.trino.plugin.openpolicyagent.schema.OpaBatchQueryResult;
 import io.trino.spi.security.SystemAccessControl;
 
 import static io.airlift.configuration.ConditionalModule.conditionalModule;

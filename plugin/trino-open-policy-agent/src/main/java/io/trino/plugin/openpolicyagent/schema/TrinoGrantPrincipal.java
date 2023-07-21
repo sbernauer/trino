@@ -11,21 +11,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.trino.plugin.openpolicyagent;
+package io.trino.plugin.openpolicyagent.schema;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.common.collect.ImmutableList;
+import io.trino.spi.security.TrinoPrincipal;
 
-import javax.validation.constraints.NotNull;
+import java.util.Optional;
 
-import java.util.List;
-
-import static java.util.Objects.requireNonNullElse;
-
-public record OpaBatchQueryResult(@JsonProperty("decision_id") String decisionId, List<Integer> result)
+public record TrinoGrantPrincipal(String type, String name)
 {
-    public @NotNull List<Integer> result()
+    public static TrinoGrantPrincipal fromTrinoPrincipal(TrinoPrincipal principal)
     {
-        return requireNonNullElse(this.result, ImmutableList.of());
+        return new TrinoGrantPrincipal(principal.getType().name(), principal.getName());
+    }
+
+    public static TrinoGrantPrincipal fromTrinoPrincipal(Optional<TrinoPrincipal> principal)
+    {
+        return principal.map(TrinoGrantPrincipal::fromTrinoPrincipal).orElse(null);
     }
 }
