@@ -13,17 +13,16 @@
  */
 package io.trino.plugin.openpolicyagent.schema;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import io.trino.spi.connector.CatalogSchemaName;
 
 import java.util.Map;
 import java.util.Optional;
 
-@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record TrinoSchema(String catalogName,
                           String schemaName,
-                          @JsonInclude(value = JsonInclude.Include.NON_NULL) Map<String, Optional<Object>> properties)
+                          Map<String, Optional<Object>> properties)
 {
     public static class Builder
             extends BaseSchemaBuilder<TrinoSchema, Builder>

@@ -13,29 +13,23 @@
  */
 package io.trino.plugin.openpolicyagent.schema;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.util.Collection;
 import java.util.List;
 
-@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
-public class OpaQueryInputAction
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public record OpaQueryInputAction(
+        String operation,
+        OpaQueryInputResource resource,
+        List<OpaQueryInputResource> filterResources,
+        OpaQueryInputResource targetResource,
+        OpaQueryInputGrant grantee,
+        TrinoGrantPrincipal grantor)
 {
-    public final String operation;
-    public final OpaQueryInputResource resource;
-    public final List<OpaQueryInputResource> filterResources;
-    public final OpaQueryInputResource targetResource;
-    public final OpaQueryInputGrant grantee;
-    public final TrinoGrantPrincipal grantor;
-
     private OpaQueryInputAction(OpaQueryInputAction.Builder builder)
     {
-        this.operation = builder.operation;
-        this.resource = builder.resource;
-        this.filterResources = builder.filterResources;
-        this.targetResource = builder.targetResource;
-        this.grantee = builder.grantee;
-        this.grantor = builder.grantor;
+        this(builder.operation, builder.resource, builder.filterResources, builder.targetResource, builder.grantee, builder.grantor);
         if (this.resource != null && this.filterResources != null) {
             throw new IllegalArgumentException("resource and filterResources cannot both be configured");
         }

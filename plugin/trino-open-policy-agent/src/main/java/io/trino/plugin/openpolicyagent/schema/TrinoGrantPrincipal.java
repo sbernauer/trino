@@ -13,10 +13,12 @@
  */
 package io.trino.plugin.openpolicyagent.schema;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.trino.spi.security.TrinoPrincipal;
 
 import java.util.Optional;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record TrinoGrantPrincipal(String type, String name)
 {
     public static TrinoGrantPrincipal fromTrinoPrincipal(TrinoPrincipal principal)

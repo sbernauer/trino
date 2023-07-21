@@ -13,11 +13,10 @@
  */
 package io.trino.plugin.openpolicyagent.schema;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
-@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
-public record TrinoFunction(String name, @JsonInclude(JsonInclude.Include.NON_NULL) String functionKind)
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public record TrinoFunction(String name, String functionKind)
 {
     public TrinoFunction(String functionName)
     {

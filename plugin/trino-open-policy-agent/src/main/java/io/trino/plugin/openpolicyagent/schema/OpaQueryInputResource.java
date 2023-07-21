@@ -13,40 +13,40 @@
  */
 package io.trino.plugin.openpolicyagent.schema;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.util.Set;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 
-@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
-public class OpaQueryInputResource
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public record OpaQueryInputResource(
+        TrinoUser user,
+        NamedEntity systemSessionProperty,
+        NamedEntity catalogSessionProperty,
+        TrinoFunction function,
+        NamedEntity catalog,
+        TrinoSchema schema,
+        TrinoTable table,
+        NamedEntity role,
+        Set<NamedEntity> roles)
 {
-    public TrinoUser user;
-    public NamedEntity systemSessionProperty;
-    public NamedEntity catalogSessionProperty;
-    public TrinoFunction function;
-    public NamedEntity catalog;
-    public TrinoSchema schema;
-    public TrinoTable table;
-    public NamedEntity role;
-    public Set<NamedEntity> roles;
-
-    @JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
+    @JsonInclude
     public record NamedEntity(String name)
     { }
 
     public OpaQueryInputResource(OpaQueryInputResource.Builder builder)
     {
-        this.user = builder.user;
-        this.systemSessionProperty = builder.systemSessionProperty;
-        this.catalog = builder.catalog;
-        this.schema = builder.schema;
-        this.table = builder.table;
-        this.role = builder.role;
-        this.catalogSessionProperty = builder.catalogSessionProperty;
-        this.function = builder.function;
-        this.roles = builder.roles;
+        this(
+                builder.user,
+                builder.systemSessionProperty,
+                builder.catalogSessionProperty,
+                builder.function,
+                builder.catalog,
+                builder.schema,
+                builder.table,
+                builder.role,
+                builder.roles);
     }
 
     public static class Builder

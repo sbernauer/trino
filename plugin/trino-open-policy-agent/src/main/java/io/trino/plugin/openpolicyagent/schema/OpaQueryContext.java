@@ -13,8 +13,10 @@
  */
 package io.trino.plugin.openpolicyagent.schema;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.trino.spi.security.SystemSecurityContext;
 
+@JsonInclude
 public record OpaQueryContext(TrinoIdentity identity)
 {
     public static OpaQueryContext fromSystemSecurityContext(SystemSecurityContext ctx)

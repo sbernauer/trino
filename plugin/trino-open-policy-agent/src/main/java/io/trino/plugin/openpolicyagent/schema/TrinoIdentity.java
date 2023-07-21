@@ -13,6 +13,7 @@
  */
 package io.trino.plugin.openpolicyagent.schema;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.trino.spi.security.Identity;
 import io.trino.spi.security.SelectedRole;
 
@@ -20,6 +21,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public record TrinoIdentity(
         String user,
         Set<String> groups,

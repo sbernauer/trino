@@ -13,24 +13,18 @@
  */
 package io.trino.plugin.openpolicyagent.schema;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.google.common.collect.ImmutableSet;
 import io.trino.spi.security.Privilege;
 
 import java.util.Set;
 
-@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY)
-public class OpaQueryInputGrant
+@JsonInclude(JsonInclude.Include.NON_NULL)
+public record OpaQueryInputGrant(Set<TrinoGrantPrincipal> principals, Boolean grantOption, String privilege)
 {
-    public Set<TrinoGrantPrincipal> principals;
-    public Boolean grantOption;
-    public String privilege;
-
     private OpaQueryInputGrant(Builder builder)
     {
-        this.principals = builder.principals;
-        this.grantOption = builder.grantOption;
-        this.privilege = builder.privilege;
+        this(builder.principals, builder.grantOption, builder.privilege);
     }
 
     public static class Builder
