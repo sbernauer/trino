@@ -90,7 +90,7 @@ public class ResponseTest
     public void testUndefinedDecisionBatchResponse()
     {
         OpaBatchQueryResult result = this.batchResponseCodec.fromJson("{}");
-        assertNull(result.result());
+        assertEquals(List.of(), result.result());
         assertNull(result.decisionId());
     }
 
