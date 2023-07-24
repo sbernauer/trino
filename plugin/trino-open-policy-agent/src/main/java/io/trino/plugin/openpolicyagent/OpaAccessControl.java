@@ -49,9 +49,12 @@ import java.util.Set;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.trino.plugin.openpolicyagent.OpaHttpClient.propagatingConsumeFuture;
 import static io.trino.spi.security.AccessDeniedException.denyAddColumn;
+import static io.trino.spi.security.AccessDeniedException.denyAlterColumn;
 import static io.trino.spi.security.AccessDeniedException.denyCatalogAccess;
 import static io.trino.spi.security.AccessDeniedException.denyCommentColumn;
 import static io.trino.spi.security.AccessDeniedException.denyCommentTable;
+import static io.trino.spi.security.AccessDeniedException.denyCommentView;
+import static io.trino.spi.security.AccessDeniedException.denyCreateCatalog;
 import static io.trino.spi.security.AccessDeniedException.denyCreateMaterializedView;
 import static io.trino.spi.security.AccessDeniedException.denyCreateRole;
 import static io.trino.spi.security.AccessDeniedException.denyCreateSchema;
@@ -61,6 +64,7 @@ import static io.trino.spi.security.AccessDeniedException.denyCreateViewWithSele
 import static io.trino.spi.security.AccessDeniedException.denyDeleteTable;
 import static io.trino.spi.security.AccessDeniedException.denyDenySchemaPrivilege;
 import static io.trino.spi.security.AccessDeniedException.denyDenyTablePrivilege;
+import static io.trino.spi.security.AccessDeniedException.denyDropCatalog;
 import static io.trino.spi.security.AccessDeniedException.denyDropColumn;
 import static io.trino.spi.security.AccessDeniedException.denyDropMaterializedView;
 import static io.trino.spi.security.AccessDeniedException.denyDropRole;
@@ -266,6 +270,30 @@ public class OpaAccessControl
                 .build();
         if (!queryOpaWithSimpleResource(context, "AccessCatalog", resource)) {
             denyCatalogAccess(catalogName);
+        }
+    }
+
+    @Override
+    public void checkCanCreateCatalog(SystemSecurityContext context, String catalog)
+    {
+        OpaQueryInputResource resource = new OpaQueryInputResource
+                .Builder()
+                .catalog(catalog)
+                .build();
+        if (!queryOpaWithSimpleResource(context, "CreateCatalog", resource)) {
+            denyCreateCatalog(catalog);
+        }
+    }
+
+    @Override
+    public void checkCanDropCatalog(SystemSecurityContext context, String catalog)
+    {
+        OpaQueryInputResource resource = new OpaQueryInputResource
+                .Builder()
+                .catalog(catalog)
+                .build();
+        if (!queryOpaWithSimpleResource(context, "DropCatalog", resource)) {
+            denyDropCatalog(catalog);
         }
     }
 
@@ -498,6 +526,18 @@ public class OpaAccessControl
     }
 
     @Override
+    public void checkCanSetViewComment(SystemSecurityContext context, CatalogSchemaTableName view)
+    {
+        OpaQueryInputResource resource = new OpaQueryInputResource
+                .Builder()
+                .table(TrinoTable.fromTrinoTable(view))
+                .build();
+        if (!queryOpaWithSimpleResource(context, "SetViewComment", resource)) {
+            denyCommentView(view.toString());
+        }
+    }
+
+    @Override
     public void checkCanSetColumnComment(SystemSecurityContext context, CatalogSchemaTableName table)
     {
         OpaQueryInputResource resource = new OpaQueryInputResource
@@ -581,6 +621,18 @@ public class OpaAccessControl
                 .build();
         if (!queryOpaWithSimpleResource(context, "AddColumn", resource)) {
             denyAddColumn(table.toString());
+        }
+    }
+
+    @Override
+    public void checkCanAlterColumn(SystemSecurityContext context, CatalogSchemaTableName table)
+    {
+        OpaQueryInputResource resource = new OpaQueryInputResource
+                .Builder()
+                .table(TrinoTable.fromTrinoTable(table))
+                .build();
+        if (!queryOpaWithSimpleResource(context, "AlterColumn", resource)) {
+            denyAlterColumn(table.toString());
         }
     }
 
@@ -887,6 +939,36 @@ public class OpaAccessControl
 
         if (!queryOpa(input)) {
             denyGrantExecuteFunctionPrivilege(functionName, context.getIdentity(), trinoPrincipalToString(grantee));
+        }
+    }
+
+    @Override
+    public void checkCanGrantExecuteFunctionPrivilege(SystemSecurityContext context, FunctionKind functionKind, CatalogSchemaRoutineName functionName, TrinoPrincipal grantee, boolean grantOption)
+    {
+        OpaQueryInputResource resource = new OpaQueryInputResource
+                .Builder()
+                .schema(new TrinoSchema
+                        .Builder()
+                        .catalogName(functionName.getCatalogName())
+                        .schemaName(functionName.getSchemaName())
+                        .build())
+                .function(new TrinoFunction(functionName.getRoutineName(), functionKind.name()))
+                .build();
+        OpaQueryInputGrant opaGrantee = new OpaQueryInputGrant
+                .Builder()
+                .principal(TrinoGrantPrincipal.fromTrinoPrincipal(grantee))
+                .grantOption(grantOption)
+                .build();
+        OpaQueryInputAction action = new OpaQueryInputAction
+                .Builder()
+                .operation("GrantExecuteFunctionPrivilege")
+                .resource(resource)
+                .grantee(opaGrantee)
+                .build();
+        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
+
+        if (!queryOpa(input)) {
+            denyGrantExecuteFunctionPrivilege(functionName.toString(), context.getIdentity(), trinoPrincipalToString(grantee));
         }
     }
 

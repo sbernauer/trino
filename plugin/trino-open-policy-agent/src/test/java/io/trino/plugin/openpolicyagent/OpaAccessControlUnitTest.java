@@ -159,10 +159,12 @@ public class OpaAccessControlUnitTest
                 OpaAccessControl::checkCanShowCreateTable,
                 OpaAccessControl::checkCanDropTable,
                 OpaAccessControl::checkCanSetTableComment,
+                OpaAccessControl::checkCanSetViewComment,
                 OpaAccessControl::checkCanSetColumnComment,
                 OpaAccessControl::checkCanShowColumns,
                 OpaAccessControl::checkCanAddColumn,
                 OpaAccessControl::checkCanDropColumn,
+                OpaAccessControl::checkCanAlterColumn,
                 OpaAccessControl::checkCanRenameColumn,
                 OpaAccessControl::checkCanInsertIntoTable,
                 OpaAccessControl::checkCanDeleteFromTable,
@@ -175,10 +177,12 @@ public class OpaAccessControlUnitTest
                 "ShowCreateTable",
                 "DropTable",
                 "SetTableComment",
+                "SetViewComment",
                 "SetColumnComment",
                 "ShowColumns",
                 "AddColumn",
                 "DropColumn",
+                "AlterColumn",
                 "RenameColumn",
                 "InsertIntoTable",
                 "DeleteFromTable",
@@ -396,6 +400,8 @@ public class OpaAccessControlUnitTest
                 OpaAccessControl::checkCanImpersonateUser,
                 OpaAccessControl::checkCanSetSystemSessionProperty,
                 OpaAccessControl::checkCanAccessCatalog,
+                OpaAccessControl::checkCanCreateCatalog,
+                OpaAccessControl::checkCanDropCatalog,
                 OpaAccessControl::checkCanShowSchemas,
                 OpaAccessControl::checkCanDropRole,
                 OpaAccessControl::checkCanExecuteFunction);
@@ -403,6 +409,8 @@ public class OpaAccessControlUnitTest
                 FunctionalHelpers.Pair.of("ImpersonateUser", "user"),
                 FunctionalHelpers.Pair.of("SetSystemSessionProperty", "systemSessionProperty"),
                 FunctionalHelpers.Pair.of("AccessCatalog", "catalog"),
+                FunctionalHelpers.Pair.of("CreateCatalog", "catalog"),
+                FunctionalHelpers.Pair.of("DropCatalog", "catalog"),
                 FunctionalHelpers.Pair.of("ShowSchemas", "catalog"),
                 FunctionalHelpers.Pair.of("DropRole", "role"),
                 FunctionalHelpers.Pair.of("ExecuteFunction", "function"));
@@ -931,6 +939,65 @@ public class OpaAccessControlUnitTest
                 () -> authorizer.checkCanGrantExecuteFunctionPrivilege(
                         requestingSecurityContext,
                         "some-function",
+                        new TrinoPrincipal(PrincipalType.USER, "some-name"),
+                        true));
+        assertTrue(
+                actualError.getMessage().contains(expectedErrorMessage),
+                String.format("Error must contain '%s': %s", expectedErrorMessage, actualError.getMessage()));
+    }
+
+    @Test
+    public void testCanGrantExecuteFunctionPrivilegeWithFunctionKind()
+    {
+        authorizer.checkCanGrantExecuteFunctionPrivilege(
+                requestingSecurityContext,
+                FunctionKind.AGGREGATE,
+                new CatalogSchemaRoutineName("some-catalog", "some-schema", "some-routine"),
+                new TrinoPrincipal(PrincipalType.USER, "some-user"),
+                true);
+
+        String expectedRequest = """
+                {
+                    "operation": "GrantExecuteFunctionPrivilege",
+                    "resource": {
+                        "function": {
+                            "name": "some-routine",
+                            "functionKind": "AGGREGATE"
+                        },
+                        "schema": {
+                            "catalogName": "some-catalog",
+                            "schemaName": "some-schema"
+                        }
+                    },
+                    "grantee": {
+                        "principals": [
+                            {
+                                "name": "some-user",
+                                "type": "USER"
+                            }
+                        ],
+                        "grantOption": true
+                    }
+                }
+                """;
+        assertStringRequestsEqual(Set.of(expectedRequest), mockClient.getRequests(), "/input/action");
+    }
+
+    @ParameterizedTest(name = "{index}: {0}")
+    @MethodSource("io.trino.plugin.openpolicyagent.TestHelpers#allErrorCasesArgumentProvider")
+    public void testCanGrantExecuteFunctionPrivilegeWithFunctionKindFailure(
+            HttpClientUtils.MockResponse failureResponse,
+            Class<? extends Throwable> expectedException,
+            String expectedErrorMessage)
+    {
+        mockClient.setHandler((request) -> failureResponse);
+
+        Throwable actualError = assertThrows(
+                expectedException,
+                () -> authorizer.checkCanGrantExecuteFunctionPrivilege(
+                        requestingSecurityContext,
+                        FunctionKind.AGGREGATE,
+                        new CatalogSchemaRoutineName("some-catalog", "some-schema", "some-routine"),
                         new TrinoPrincipal(PrincipalType.USER, "some-name"),
                         true));
         assertTrue(
