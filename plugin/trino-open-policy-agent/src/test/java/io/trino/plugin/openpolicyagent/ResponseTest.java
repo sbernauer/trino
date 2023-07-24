@@ -86,21 +86,11 @@ public class ResponseTest
         assertNull(result.decisionId());
     }
 
-    @Test
-    public void testUndefinedDecisionBatchResponse()
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"result\": []}"})
+    public void testEmptyOrUndefinedResponses(String response)
     {
-        OpaBatchQueryResult result = this.batchResponseCodec.fromJson("{}");
-        assertEquals(List.of(), result.result());
-        assertNull(result.decisionId());
-    }
-
-    @Test
-    public void testBatchResponseEmptyNoDecisionId()
-    {
-        OpaBatchQueryResult result = this.batchResponseCodec.fromJson("""
-                {
-                    "result": []
-                }""");
+        OpaBatchQueryResult result = this.batchResponseCodec.fromJson(response);
         assertEquals(List.of(), result.result());
         assertNull(result.decisionId());
     }
