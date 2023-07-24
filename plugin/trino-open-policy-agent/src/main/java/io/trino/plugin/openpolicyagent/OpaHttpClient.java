@@ -17,7 +17,6 @@ import com.google.common.util.concurrent.FluentFuture;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.inject.Inject;
-import io.airlift.concurrent.BoundedExecutor;
 import io.airlift.http.client.FullJsonResponseHandler;
 import io.airlift.http.client.HttpClient;
 import io.airlift.http.client.HttpStatus;
@@ -40,11 +39,9 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.net.HttpHeaders.CONTENT_TYPE;
 import static com.google.common.net.MediaType.JSON_UTF_8;
-import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.http.client.FullJsonResponseHandler.createFullJsonResponseHandler;
 import static io.airlift.http.client.JsonBodyGenerator.jsonBodyGenerator;
 import static io.airlift.http.client.Request.Builder.preparePost;
-import static java.util.concurrent.Executors.newCachedThreadPool;
 
 public class OpaHttpClient
 {
@@ -53,13 +50,14 @@ public class OpaHttpClient
     private final Executor executor;
 
     @Inject
-    public OpaHttpClient(@ForOpa HttpClient httpClient, JsonCodec<OpaQuery> serializer)
+    public OpaHttpClient(
+            @ForOpa HttpClient httpClient,
+            JsonCodec<OpaQuery> serializer,
+            @ForOpa Executor executor)
     {
         this.httpClient = httpClient;
         this.serializer = serializer;
-        this.executor = new BoundedExecutor(
-                newCachedThreadPool(daemonThreadsNamed("opa-access-control-http-%s")),
-                Runtime.getRuntime().availableProcessors());
+        this.executor = executor;
     }
 
     public <T> FluentFuture<T> submitOpaRequest(OpaQueryInput input, URI uri, JsonCodec<T> deserializer)

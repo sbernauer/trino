@@ -16,8 +16,10 @@ package io.trino.plugin.openpolicyagent;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.inject.Injector;
 import com.google.inject.Key;
+import com.google.inject.Provider;
 import com.google.inject.Scopes;
 import io.airlift.bootstrap.Bootstrap;
+import io.airlift.concurrent.BoundedExecutor;
 import io.airlift.http.client.HttpClient;
 import io.airlift.json.JsonModule;
 import io.trino.plugin.openpolicyagent.schema.OpaQuery;
@@ -27,10 +29,13 @@ import io.trino.spi.security.SystemAccessControlFactory;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 
+import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.airlift.http.client.HttpClientBinder.httpClientBinder;
 import static io.airlift.json.JsonCodecBinder.jsonCodecBinder;
 import static java.util.Objects.requireNonNull;
+import static java.util.concurrent.Executors.newCachedThreadPool;
 
 public class OpaAccessControlFactory
         implements SystemAccessControlFactory
@@ -63,6 +68,9 @@ public class OpaAccessControlFactory
                     else {
                         binder.bind(Key.get(HttpClient.class, ForOpa.class)).toInstance(httpClient.orElseThrow());
                     }
+                    binder.bind(Key.get(Executor.class, ForOpa.class))
+                            .toProvider(ExecutorProvider.class)
+                            .in(Scopes.SINGLETON);
                     binder.bind(OpaHttpClient.class).in(Scopes.SINGLETON);
                 },
                 new OpaAccessControlModule());
@@ -72,5 +80,24 @@ public class OpaAccessControlFactory
                 .setRequiredConfigurationProperties(config)
                 .initialize();
         return injector.getInstance(Key.get(SystemAccessControl.class, ForOpa.class));
+    }
+
+    private static class ExecutorProvider
+            implements Provider<Executor>
+    {
+        private final Executor executor;
+
+        private ExecutorProvider()
+        {
+            this.executor = new BoundedExecutor(
+                    newCachedThreadPool(daemonThreadsNamed("opa-access-control-http-%s")),
+                    Runtime.getRuntime().availableProcessors());
+        }
+
+        @Override
+        public Executor get()
+        {
+            return executor;
+        }
     }
 }
