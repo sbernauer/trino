@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-public class ResponseTests
+public class ResponseTest
 {
     private JsonCodec<OpaQueryResult> responseCodec;
     private JsonCodec<OpaBatchQueryResult> batchResponseCodec;
