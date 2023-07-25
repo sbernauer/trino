@@ -26,6 +26,10 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.utility.DockerImageName;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -47,28 +51,18 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+@Testcontainers
 public class OpaAccessControlSystemTest
 {
     private static URI opaServerUri;
-    private static Process opaServer;
     private static TestingTrinoServer trinoServer;
     private static TestingTrinoClient trinoClient;
 
-    /**
-     * Get an unused TCP port on a local interface from the system
-     * <p>
-     * There is a minor race condition here, in that the port is deallocated before it is used
-     * again, but this is more or less unavoidable when allocating a port for a subprocess without
-     * FD-passing.
-     */
-    private static InetSocketAddress findAvailableTcpPort()
-            throws IOException
-    {
-        try (Socket sock = new Socket()) {
-            sock.bind(new InetSocketAddress("127.0.0.1", 0));
-            return new InetSocketAddress(sock.getLocalAddress(), sock.getLocalPort());
-        }
-    }
+    private static final int OPA_PORT = 8181;
+    @Container
+    public static GenericContainer<?> opaContainer = new GenericContainer<>(DockerImageName.parse("openpolicyagent/opa:latest-rootless"))
+            .withCommand("run", "--server", "--addr", ":%d".formatted(OPA_PORT))
+            .withExposedPorts(OPA_PORT);
 
     private static void awaitSocketOpen(InetSocketAddress addr, int attempts, int timeoutMs)
             throws IOException, InterruptedException
@@ -85,23 +79,19 @@ public class OpaAccessControlSystemTest
                 Thread.sleep(timeoutMs);
             }
         }
-        throw new SocketTimeoutException("Timed out waiting for addr " + addr + " to be available ("
-                + attempts + " attempts made at " + timeoutMs + "ms each)");
+        throw new SocketTimeoutException(
+                "Timed out waiting for addr %s to be available (%d attempts made with a %d ms wait)"
+                        .formatted(addr, attempts, timeoutMs));
     }
 
     @BeforeAll
-    public static void setupOpa()
+    public static void ensureOpaUp()
             throws IOException, InterruptedException
     {
-        InetSocketAddress opaSocket = findAvailableTcpPort();
+        assertTrue(opaContainer.isRunning());
+        InetSocketAddress opaSocket = new InetSocketAddress(opaContainer.getHost(), opaContainer.getMappedPort(OPA_PORT));
         String opaEndpoint = String.format("%s:%d", opaSocket.getHostString(), opaSocket.getPort());
         System.out.println("OPA has endpoint " + opaEndpoint);
-        opaServer = new ProcessBuilder(System.getenv().getOrDefault("OPA_BINARY", "opa"),
-                "run",
-                "--server",
-                "--addr", opaEndpoint,
-                "--set", "decision_logs.console=true"
-        ).inheritIO().start();
         awaitSocketOpen(opaSocket, 100, 200);
         opaServerUri = URI.create(String.format("http://%s/", opaEndpoint));
     }
@@ -111,20 +101,13 @@ public class OpaAccessControlSystemTest
             throws IOException
     {
         try {
-            if (opaServer != null) {
-                opaServer.destroy();
+            if (trinoClient != null) {
+                trinoClient.close();
             }
         }
         finally {
-            try {
-                if (trinoClient != null) {
-                    trinoClient.close();
-                }
-            }
-            finally {
-                if (trinoServer != null) {
-                    trinoServer.close();
-                }
+            if (trinoServer != null) {
+                trinoServer.close();
             }
         }
     }
