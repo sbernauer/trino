@@ -77,7 +77,12 @@ public class OpaHttpClient
                 .transform((response) -> parseOpaResponse(response, uri), executor);
     }
 
-    public static <T> T parseOpaResponse(FullJsonResponseHandler.JsonResponse<T> response, URI uri)
+    public <T> T getOpaResponse(OpaQueryInput input, URI uri, JsonCodec<T> deserializer)
+    {
+        return propagatingConsumeFuture(submitOpaRequest(input, uri, deserializer));
+    }
+
+    private <T> T parseOpaResponse(FullJsonResponseHandler.JsonResponse<T> response, URI uri)
     {
         int statusCode = response.getStatusCode();
         if (HttpStatus.familyForStatusCode(statusCode) != HttpStatus.Family.SUCCESSFUL) {
@@ -92,7 +97,7 @@ public class OpaHttpClient
         return response.getValue();
     }
 
-    public static <T> T propagatingConsumeFuture(ListenableFuture<T> opaResponseFuture)
+    private <T> T propagatingConsumeFuture(ListenableFuture<T> opaResponseFuture)
     {
         try {
             return opaResponseFuture.get();
@@ -119,7 +124,7 @@ public class OpaHttpClient
                 Futures.whenAllComplete(allFutures).call(() ->
                                 allFutures
                                         .stream()
-                                        .map(OpaHttpClient::propagatingConsumeFuture)
+                                        .map(this::propagatingConsumeFuture)
                                         .filter(Optional::isPresent)
                                         .map(Optional::get)
                                         .collect(toImmutableSet()),

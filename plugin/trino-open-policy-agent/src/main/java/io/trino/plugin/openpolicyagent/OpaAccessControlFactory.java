@@ -68,6 +68,7 @@ public class OpaAccessControlFactory
                     else {
                         binder.bind(Key.get(HttpClient.class, ForOpa.class)).toInstance(httpClient.orElseThrow());
                     }
+                    binder.bind(OpaHighLevelClient.class);
                     binder.bind(Key.get(Executor.class, ForOpa.class))
                             .toProvider(ExecutorProvider.class)
                             .in(Scopes.SINGLETON);

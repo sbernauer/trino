@@ -15,7 +15,6 @@ package io.trino.plugin.openpolicyagent.schema;
 
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public abstract class BaseSchemaBuilder<T, B extends BaseSchemaBuilder<T, B>>
@@ -38,14 +37,16 @@ public abstract class BaseSchemaBuilder<T, B extends BaseSchemaBuilder<T, B>>
         return getInstance();
     }
 
-    public B properties(Map<String, Object> properties)
+    private Optional<Object> buildOptional(Object item)
     {
-        return propertiesWithGetter(properties, Optional::ofNullable);
+        Object valueToUse = item;
+        if (item instanceof Optional) {
+            valueToUse = ((Optional<?>) item).orElse(null);
+        }
+        return Optional.ofNullable(valueToUse);
     }
 
-    protected <V> B propertiesWithGetter(
-            Map<String, V> properties,
-            Function<V, Optional<Object>> optionalBuilder)
+    public B properties(Map<String, ?> properties)
     {
         // https://openjdk.org/jeps/269
         // ImmutableMap along with other new collections does not support null
@@ -53,7 +54,7 @@ public abstract class BaseSchemaBuilder<T, B extends BaseSchemaBuilder<T, B>>
         this.properties = properties
                 .entrySet()
                 .stream()
-                .map((e) -> Map.entry(e.getKey(), optionalBuilder.apply(e.getValue())))
+                .map((e) -> Map.entry(e.getKey(), buildOptional(e.getValue())))
                 .collect(Collectors.toUnmodifiableMap(Map.Entry::getKey, Map.Entry::getValue));
         return getInstance();
     }

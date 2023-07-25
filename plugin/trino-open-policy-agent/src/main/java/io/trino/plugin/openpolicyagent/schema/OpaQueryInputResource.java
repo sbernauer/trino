@@ -115,6 +115,12 @@ public record OpaQueryInputResource(
             return this;
         }
 
+        public Builder function(String functionName)
+        {
+            this.function = new TrinoFunction(functionName);
+            return this;
+        }
+
         public OpaQueryInputResource build()
         {
             return new OpaQueryInputResource(this);

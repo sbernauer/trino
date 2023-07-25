@@ -15,13 +15,11 @@ package io.trino.plugin.openpolicyagent;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.inject.Inject;
-import io.airlift.json.JsonCodec;
 import io.trino.plugin.openpolicyagent.schema.OpaQueryContext;
 import io.trino.plugin.openpolicyagent.schema.OpaQueryInput;
 import io.trino.plugin.openpolicyagent.schema.OpaQueryInputAction;
 import io.trino.plugin.openpolicyagent.schema.OpaQueryInputGrant;
 import io.trino.plugin.openpolicyagent.schema.OpaQueryInputResource;
-import io.trino.plugin.openpolicyagent.schema.OpaQueryResult;
 import io.trino.plugin.openpolicyagent.schema.TrinoFunction;
 import io.trino.plugin.openpolicyagent.schema.TrinoGrantPrincipal;
 import io.trino.plugin.openpolicyagent.schema.TrinoSchema;
@@ -32,13 +30,13 @@ import io.trino.spi.connector.CatalogSchemaRoutineName;
 import io.trino.spi.connector.CatalogSchemaTableName;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.function.FunctionKind;
+import io.trino.spi.security.AccessDeniedException;
 import io.trino.spi.security.Identity;
 import io.trino.spi.security.Privilege;
 import io.trino.spi.security.SystemAccessControl;
 import io.trino.spi.security.SystemSecurityContext;
 import io.trino.spi.security.TrinoPrincipal;
 
-import java.net.URI;
 import java.security.Principal;
 import java.util.Collection;
 import java.util.Locale;
@@ -47,44 +45,20 @@ import java.util.Optional;
 import java.util.Set;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static io.trino.plugin.openpolicyagent.OpaHttpClient.propagatingConsumeFuture;
-import static io.trino.spi.security.AccessDeniedException.denyAddColumn;
-import static io.trino.spi.security.AccessDeniedException.denyAlterColumn;
-import static io.trino.spi.security.AccessDeniedException.denyCatalogAccess;
-import static io.trino.spi.security.AccessDeniedException.denyCommentColumn;
-import static io.trino.spi.security.AccessDeniedException.denyCommentTable;
-import static io.trino.spi.security.AccessDeniedException.denyCommentView;
-import static io.trino.spi.security.AccessDeniedException.denyCreateCatalog;
-import static io.trino.spi.security.AccessDeniedException.denyCreateMaterializedView;
+import static io.trino.plugin.openpolicyagent.OpaHighLevelClient.DenyCallable;
+import static io.trino.plugin.openpolicyagent.OpaHighLevelClient.buildQueryInputForSimpleResource;
 import static io.trino.spi.security.AccessDeniedException.denyCreateRole;
-import static io.trino.spi.security.AccessDeniedException.denyCreateSchema;
-import static io.trino.spi.security.AccessDeniedException.denyCreateTable;
-import static io.trino.spi.security.AccessDeniedException.denyCreateView;
 import static io.trino.spi.security.AccessDeniedException.denyCreateViewWithSelect;
-import static io.trino.spi.security.AccessDeniedException.denyDeleteTable;
 import static io.trino.spi.security.AccessDeniedException.denyDenySchemaPrivilege;
 import static io.trino.spi.security.AccessDeniedException.denyDenyTablePrivilege;
-import static io.trino.spi.security.AccessDeniedException.denyDropCatalog;
-import static io.trino.spi.security.AccessDeniedException.denyDropColumn;
-import static io.trino.spi.security.AccessDeniedException.denyDropMaterializedView;
-import static io.trino.spi.security.AccessDeniedException.denyDropRole;
-import static io.trino.spi.security.AccessDeniedException.denyDropSchema;
-import static io.trino.spi.security.AccessDeniedException.denyDropTable;
-import static io.trino.spi.security.AccessDeniedException.denyDropView;
 import static io.trino.spi.security.AccessDeniedException.denyExecuteFunction;
 import static io.trino.spi.security.AccessDeniedException.denyExecuteProcedure;
-import static io.trino.spi.security.AccessDeniedException.denyExecuteQuery;
 import static io.trino.spi.security.AccessDeniedException.denyExecuteTableProcedure;
 import static io.trino.spi.security.AccessDeniedException.denyGrantExecuteFunctionPrivilege;
 import static io.trino.spi.security.AccessDeniedException.denyGrantRoles;
 import static io.trino.spi.security.AccessDeniedException.denyGrantSchemaPrivilege;
 import static io.trino.spi.security.AccessDeniedException.denyGrantTablePrivilege;
 import static io.trino.spi.security.AccessDeniedException.denyImpersonateUser;
-import static io.trino.spi.security.AccessDeniedException.denyInsertTable;
-import static io.trino.spi.security.AccessDeniedException.denyKillQuery;
-import static io.trino.spi.security.AccessDeniedException.denyReadSystemInformationAccess;
-import static io.trino.spi.security.AccessDeniedException.denyRefreshMaterializedView;
-import static io.trino.spi.security.AccessDeniedException.denyRenameColumn;
 import static io.trino.spi.security.AccessDeniedException.denyRenameMaterializedView;
 import static io.trino.spi.security.AccessDeniedException.denyRenameSchema;
 import static io.trino.spi.security.AccessDeniedException.denyRenameTable;
@@ -92,45 +66,21 @@ import static io.trino.spi.security.AccessDeniedException.denyRenameView;
 import static io.trino.spi.security.AccessDeniedException.denyRevokeRoles;
 import static io.trino.spi.security.AccessDeniedException.denyRevokeSchemaPrivilege;
 import static io.trino.spi.security.AccessDeniedException.denyRevokeTablePrivilege;
-import static io.trino.spi.security.AccessDeniedException.denySelectColumns;
 import static io.trino.spi.security.AccessDeniedException.denySetCatalogSessionProperty;
-import static io.trino.spi.security.AccessDeniedException.denySetMaterializedViewProperties;
 import static io.trino.spi.security.AccessDeniedException.denySetSchemaAuthorization;
-import static io.trino.spi.security.AccessDeniedException.denySetSystemSessionProperty;
 import static io.trino.spi.security.AccessDeniedException.denySetTableAuthorization;
-import static io.trino.spi.security.AccessDeniedException.denySetTableProperties;
 import static io.trino.spi.security.AccessDeniedException.denySetViewAuthorization;
-import static io.trino.spi.security.AccessDeniedException.denyShowColumns;
-import static io.trino.spi.security.AccessDeniedException.denyShowCreateSchema;
-import static io.trino.spi.security.AccessDeniedException.denyShowCreateTable;
-import static io.trino.spi.security.AccessDeniedException.denyShowCurrentRoles;
-import static io.trino.spi.security.AccessDeniedException.denyShowRoleAuthorizationDescriptors;
-import static io.trino.spi.security.AccessDeniedException.denyShowRoleGrants;
-import static io.trino.spi.security.AccessDeniedException.denyShowRoles;
-import static io.trino.spi.security.AccessDeniedException.denyShowSchemas;
-import static io.trino.spi.security.AccessDeniedException.denyShowTables;
-import static io.trino.spi.security.AccessDeniedException.denyTruncateTable;
-import static io.trino.spi.security.AccessDeniedException.denyUpdateTableColumns;
-import static io.trino.spi.security.AccessDeniedException.denyViewQuery;
-import static io.trino.spi.security.AccessDeniedException.denyWriteSystemInformationAccess;
 import static java.lang.String.format;
 
 public class OpaAccessControl
         implements SystemAccessControl
 {
-    private final JsonCodec<OpaQueryResult> queryResultCodec;
-    private final URI opaPolicyUri;
-    protected final OpaHttpClient opaHttpClient;
+    protected final OpaHighLevelClient opaHighLevelClient;
 
     @Inject
-    public OpaAccessControl(
-            JsonCodec<OpaQueryResult> queryResultCodec,
-            OpaHttpClient httpClient,
-            OpaConfig config)
+    public OpaAccessControl(OpaHighLevelClient opaHighLevelClient)
     {
-        this.opaPolicyUri = config.getOpaUri();
-        this.opaHttpClient = httpClient;
-        this.queryResultCodec = queryResultCodec;
+        this.opaHighLevelClient = opaHighLevelClient;
     }
 
     private static String trinoPrincipalToString(TrinoPrincipal principal)
@@ -138,44 +88,15 @@ public class OpaAccessControl
         return format("%s '%s'", principal.getType().name().toLowerCase(Locale.ENGLISH), principal.getName());
     }
 
-    protected boolean queryOpa(OpaQueryInput input)
-    {
-        return propagatingConsumeFuture(opaHttpClient.submitOpaRequest(input, opaPolicyUri, queryResultCodec)).result();
-    }
-
-    private OpaQueryInput buildQueryInputForSimpleAction(SystemSecurityContext context, String operation)
-    {
-        OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation(operation).build();
-        return new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
-    }
-
-    private OpaQueryInput buildQueryInputForSimpleResource(SystemSecurityContext context, String operation, OpaQueryInputResource resource)
-    {
-        OpaQueryInputAction action = new OpaQueryInputAction.Builder().operation(operation).resource(resource).build();
-        return new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
-    }
-
-    protected boolean queryOpaWithSimpleAction(SystemSecurityContext context, String operation)
-    {
-        return queryOpa(buildQueryInputForSimpleAction(context, operation));
-    }
-
-    protected boolean queryOpaWithSimpleResource(SystemSecurityContext context, String operation, OpaQueryInputResource resource)
-    {
-        return queryOpa(buildQueryInputForSimpleResource(context, operation, resource));
-    }
-
     @Override
     public void checkCanImpersonateUser(SystemSecurityContext context, String userName)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .user(new TrinoUser(userName))
-                .build();
-
-        if (!queryOpaWithSimpleResource(context, "ImpersonateUser", resource)) {
-            denyImpersonateUser(context.getIdentity().getUser(), userName);
-        }
+        opaHighLevelClient.queryAndEnforce(
+                context,
+                "ImpersonateUser",
+                () -> denyImpersonateUser(context.getIdentity().getUser(), userName),
+                OpaQueryInputResource.Builder::user,
+                new TrinoUser(userName));
     }
 
     @Override
@@ -187,120 +108,94 @@ public class OpaAccessControl
     @Override
     public void checkCanExecuteQuery(SystemSecurityContext context)
     {
-        if (!queryOpaWithSimpleAction(context, "ExecuteQuery")) {
-            denyExecuteQuery();
-        }
+        opaHighLevelClient.queryAndEnforce(context, "ExecuteQuery", AccessDeniedException::denyExecuteQuery);
     }
 
     @Override
     public void checkCanViewQueryOwnedBy(SystemSecurityContext context, Identity queryOwner)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .user(new TrinoUser(queryOwner))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "ViewQueryOwnedBy", resource)) {
-            denyViewQuery();
-        }
+        opaHighLevelClient.queryAndEnforce(context, "ViewQueryOwnedBy", AccessDeniedException::denyViewQuery, queryOwner);
     }
 
     @Override
     public Collection<Identity> filterViewQueryOwnedBy(SystemSecurityContext context, Collection<Identity> queryOwners)
     {
-        return opaHttpClient.parallelFilterFromOpa(
+        return opaHighLevelClient.parallelFilterFromOpa(
                 queryOwners,
                 (i) -> buildQueryInputForSimpleResource(
                         context,
                         "FilterViewQueryOwnedBy",
                         new OpaQueryInputResource.Builder()
                                 .user(new TrinoUser(i))
-                                .build()),
-                opaPolicyUri,
-                queryResultCodec);
+                                .build()));
     }
 
     @Override
     public void checkCanKillQueryOwnedBy(SystemSecurityContext context, Identity queryOwner)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .user(new TrinoUser(queryOwner))
-                .build();
-
-        if (!queryOpaWithSimpleResource(context, "KillQueryOwnedBy", resource)) {
-            denyKillQuery();
-        }
+        opaHighLevelClient.queryAndEnforce(context, "KillQueryOwnedBy", AccessDeniedException::denyKillQuery, queryOwner);
     }
 
     @Override
     public void checkCanReadSystemInformation(SystemSecurityContext context)
     {
-        if (!queryOpaWithSimpleAction(context, "ReadSystemInformation")) {
-            denyReadSystemInformationAccess();
-        }
+        opaHighLevelClient.queryAndEnforce(context, "ReadSystemInformation", AccessDeniedException::denyReadSystemInformationAccess);
     }
 
     @Override
     public void checkCanWriteSystemInformation(SystemSecurityContext context)
     {
-        if (!queryOpaWithSimpleAction(context, "WriteSystemInformation")) {
-            denyWriteSystemInformationAccess();
-        }
+        opaHighLevelClient.queryAndEnforce(context, "WriteSystemInformation", AccessDeniedException::denyWriteSystemInformationAccess);
     }
 
     @Override
     public void checkCanSetSystemSessionProperty(SystemSecurityContext context, String propertyName)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .systemSessionProperty(propertyName)
-                .build();
-
-        if (!queryOpaWithSimpleResource(context, "SetSystemSessionProperty", resource)) {
-            denySetSystemSessionProperty(propertyName);
-        }
+        opaHighLevelClient.queryAndEnforce(
+                context,
+                "SetSystemSessionProperty",
+                AccessDeniedException::denySetSystemSessionProperty,
+                OpaQueryInputResource.Builder::systemSessionProperty,
+                propertyName);
     }
 
     @Override
     public void checkCanAccessCatalog(SystemSecurityContext context, String catalogName)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .catalog(catalogName)
-                .build();
-        if (!queryOpaWithSimpleResource(context, "AccessCatalog", resource)) {
-            denyCatalogAccess(catalogName);
-        }
+        opaHighLevelClient.queryAndEnforce(
+                context,
+                "AccessCatalog",
+                AccessDeniedException::denyCatalogAccess,
+                OpaQueryInputResource.Builder::catalog,
+                catalogName);
     }
 
     @Override
     public void checkCanCreateCatalog(SystemSecurityContext context, String catalog)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .catalog(catalog)
-                .build();
-        if (!queryOpaWithSimpleResource(context, "CreateCatalog", resource)) {
-            denyCreateCatalog(catalog);
-        }
+        opaHighLevelClient.queryAndEnforce(
+                context,
+                "CreateCatalog",
+                AccessDeniedException::denyCreateCatalog,
+                OpaQueryInputResource.Builder::catalog,
+                catalog);
     }
 
     @Override
     public void checkCanDropCatalog(SystemSecurityContext context, String catalog)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .catalog(catalog)
-                .build();
-        if (!queryOpaWithSimpleResource(context, "DropCatalog", resource)) {
-            denyDropCatalog(catalog);
-        }
+        opaHighLevelClient.queryAndEnforce(
+                context,
+                "DropCatalog",
+                AccessDeniedException::denyDropCatalog,
+                OpaQueryInputResource.Builder::catalog,
+                catalog);
     }
 
     @Override
     public Set<String> filterCatalogs(SystemSecurityContext context, Set<String> catalogs)
     {
-        return opaHttpClient.parallelFilterFromOpa(
+        return opaHighLevelClient.parallelFilterFromOpa(
                 catalogs,
                 (c) -> buildQueryInputForSimpleResource(
                         context,
@@ -308,36 +203,24 @@ public class OpaAccessControl
                         new OpaQueryInputResource
                                 .Builder()
                                 .catalog(c)
-                                .build()),
-                opaPolicyUri,
-                queryResultCodec);
+                                .build()));
     }
 
     @Override
     public void checkCanCreateSchema(SystemSecurityContext context, CatalogSchemaName schema, Map<String, Object> properties)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .schema(TrinoSchema.Builder
-                        .fromTrinoCatalogSchema(schema)
-                        .properties(properties)
-                        .build())
-                .build();
-        if (!queryOpaWithSimpleResource(context, "CreateSchema", resource)) {
-            denyCreateSchema(schema.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(
+                context,
+                "CreateSchema",
+                AccessDeniedException::denyCreateSchema,
+                schema,
+                properties);
     }
 
     @Override
     public void checkCanDropSchema(SystemSecurityContext context, CatalogSchemaName schema)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .schema(TrinoSchema.fromTrinoCatalogSchema(schema))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "DropSchema", resource)) {
-            denyDropSchema(schema.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "DropSchema", AccessDeniedException::denyDropSchema, schema);
     }
 
     @Override
@@ -354,15 +237,8 @@ public class OpaAccessControl
                         .schemaName(newSchemaName)
                         .build())
                 .build();
-        OpaQueryInputAction action = new OpaQueryInputAction
-                .Builder()
-                .operation("RenameSchema")
-                .resource(resource)
-                .targetResource(targetResource)
-                .build();
-        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpaWithSourceAndTargetResource(context, "RenameSchema", resource, targetResource)) {
             denyRenameSchema(schema.toString(), newSchemaName);
         }
     }
@@ -386,7 +262,7 @@ public class OpaAccessControl
                 .build();
         OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpa(input)) {
             denySetSchemaAuthorization(schema.toString(), principal);
         }
     }
@@ -394,19 +270,18 @@ public class OpaAccessControl
     @Override
     public void checkCanShowSchemas(SystemSecurityContext context, String catalogName)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .catalog(catalogName)
-                .build();
-        if (!queryOpaWithSimpleResource(context, "ShowSchemas", resource)) {
-            denyShowSchemas();
-        }
+        opaHighLevelClient.queryAndEnforce(
+                context,
+                "ShowSchemas",
+                (DenyCallable) AccessDeniedException::denyShowSchemas,
+                OpaQueryInputResource.Builder::catalog,
+                catalogName);
     }
 
     @Override
     public Set<String> filterSchemas(SystemSecurityContext context, String catalogName, Set<String> schemaNames)
     {
-        return opaHttpClient.parallelFilterFromOpa(
+        return opaHighLevelClient.parallelFilterFromOpa(
                 schemaNames,
                 (s) -> buildQueryInputForSimpleResource(
                         context,
@@ -417,82 +292,50 @@ public class OpaAccessControl
                                         .catalogName(catalogName)
                                         .schemaName(s)
                                         .build())
-                                .build()),
-                opaPolicyUri,
-                queryResultCodec);
+                                .build()));
     }
 
     @Override
     public void checkCanShowCreateSchema(SystemSecurityContext context, CatalogSchemaName schemaName)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .schema(TrinoSchema.fromTrinoCatalogSchema(schemaName))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "ShowCreateSchema", resource)) {
-            denyShowCreateSchema(schemaName.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "ShowCreateSchema", AccessDeniedException::denyShowCreateSchema, schemaName);
     }
 
     @Override
     public void checkCanShowCreateTable(SystemSecurityContext context, CatalogSchemaTableName table)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.fromTrinoTable(table))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "ShowCreateTable", resource)) {
-            denyShowCreateTable(table.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "ShowCreateTable", AccessDeniedException::denyShowCreateTable, table);
     }
 
     @Override
     public void checkCanCreateTable(SystemSecurityContext context, CatalogSchemaTableName table, Map<String, Object> properties)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.Builder
-                        .fromTrinoTable(table)
-                        .properties(properties)
-                        .build())
-                .build();
-        if (!queryOpaWithSimpleResource(context, "CreateTable", resource)) {
-            denyCreateTable(table.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(
+                context,
+                "CreateTable",
+                AccessDeniedException::denyCreateTable,
+                table,
+                properties);
     }
 
     @Override
     public void checkCanDropTable(SystemSecurityContext context, CatalogSchemaTableName table)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.fromTrinoTable(table))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "DropTable", resource)) {
-            denyDropTable(table.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "DropTable", AccessDeniedException::denyDropTable, table);
     }
 
     @Override
     public void checkCanRenameTable(SystemSecurityContext context, CatalogSchemaTableName table, CatalogSchemaTableName newTable)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
+        OpaQueryInputResource oldResource = new OpaQueryInputResource
                 .Builder()
                 .table(TrinoTable.fromTrinoTable(table))
                 .build();
-        OpaQueryInputResource targetResource = new OpaQueryInputResource
+        OpaQueryInputResource newResource = new OpaQueryInputResource
                 .Builder()
                 .table(TrinoTable.fromTrinoTable(newTable))
                 .build();
-        OpaQueryInputAction action = new OpaQueryInputAction
-                .Builder()
-                .operation("RenameTable")
-                .resource(resource)
-                .targetResource(targetResource)
-                .build();
-        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
-
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpaWithSourceAndTargetResource(context, "RenameTable", oldResource, newResource)) {
             denyRenameTable(table.toString(), newTable.toString());
         }
     }
@@ -500,71 +343,42 @@ public class OpaAccessControl
     @Override
     public void checkCanSetTableProperties(SystemSecurityContext context, CatalogSchemaTableName table, Map<String, Optional<Object>> properties)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.Builder
-                        .fromTrinoTable(table)
-                        .optionalProperties(properties)
-                        .build())
-                .build();
-
-        if (!queryOpaWithSimpleResource(context, "SetTableProperties", resource)) {
-            denySetTableProperties(table.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(
+                context,
+                "SetTableProperties",
+                AccessDeniedException::denySetTableProperties,
+                table,
+                properties);
     }
 
     @Override
     public void checkCanSetTableComment(SystemSecurityContext context, CatalogSchemaTableName table)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.fromTrinoTable(table))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "SetTableComment", resource)) {
-            denyCommentTable(table.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "SetTableComment", AccessDeniedException::denyCommentTable, table);
     }
 
     @Override
     public void checkCanSetViewComment(SystemSecurityContext context, CatalogSchemaTableName view)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.fromTrinoTable(view))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "SetViewComment", resource)) {
-            denyCommentView(view.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "SetViewComment", AccessDeniedException::denyCommentView, view);
     }
 
     @Override
     public void checkCanSetColumnComment(SystemSecurityContext context, CatalogSchemaTableName table)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.fromTrinoTable(table))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "SetColumnComment", resource)) {
-            denyCommentColumn(table.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "SetColumnComment", AccessDeniedException::denyCommentColumn, table);
     }
 
     @Override
     public void checkCanShowTables(SystemSecurityContext context, CatalogSchemaName schema)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .schema(TrinoSchema.fromTrinoCatalogSchema(schema))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "ShowTables", resource)) {
-            denyShowTables(schema.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "ShowTables", AccessDeniedException::denyShowTables, schema);
     }
 
     @Override
     public Set<SchemaTableName> filterTables(SystemSecurityContext context, String catalogName, Set<SchemaTableName> tableNames)
     {
-        return opaHttpClient.parallelFilterFromOpa(
+        return opaHighLevelClient.parallelFilterFromOpa(
                 tableNames,
                 (tbl) -> buildQueryInputForSimpleResource(
                         context,
@@ -576,27 +390,19 @@ public class OpaAccessControl
                                         .schemaName(tbl.getSchemaName())
                                         .tableName(tbl.getTableName())
                                         .build())
-                                .build()),
-                opaPolicyUri,
-                queryResultCodec);
+                                .build()));
     }
 
     @Override
     public void checkCanShowColumns(SystemSecurityContext context, CatalogSchemaTableName table)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.fromTrinoTable(table))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "ShowColumns", resource)) {
-            denyShowColumns(table.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "ShowColumns", AccessDeniedException::denyShowColumns, table);
     }
 
     @Override
     public Set<String> filterColumns(SystemSecurityContext context, CatalogSchemaTableName table, Set<String> columns)
     {
-        return opaHttpClient.parallelFilterFromOpa(
+        return opaHighLevelClient.parallelFilterFromOpa(
                 columns,
                 (column) -> buildQueryInputForSimpleResource(
                         context,
@@ -607,45 +413,25 @@ public class OpaAccessControl
                                         .fromTrinoTable(table)
                                         .columns(ImmutableSet.of(column))
                                         .build())
-                                .build()),
-                opaPolicyUri,
-                queryResultCodec);
+                                .build()));
     }
 
     @Override
     public void checkCanAddColumn(SystemSecurityContext context, CatalogSchemaTableName table)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.fromTrinoTable(table))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "AddColumn", resource)) {
-            denyAddColumn(table.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "AddColumn", AccessDeniedException::denyAddColumn, table);
     }
 
     @Override
     public void checkCanAlterColumn(SystemSecurityContext context, CatalogSchemaTableName table)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.fromTrinoTable(table))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "AlterColumn", resource)) {
-            denyAlterColumn(table.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "AlterColumn", AccessDeniedException::denyAlterColumn, table);
     }
 
     @Override
     public void checkCanDropColumn(SystemSecurityContext context, CatalogSchemaTableName table)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.fromTrinoTable(table))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "DropColumn", resource)) {
-            denyDropColumn(table.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "DropColumn", AccessDeniedException::denyDropColumn, table);
     }
 
     @Override
@@ -667,7 +453,7 @@ public class OpaAccessControl
                 .build();
         OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpa(input)) {
             denySetTableAuthorization(table.toString(), principal);
         }
     }
@@ -675,114 +461,67 @@ public class OpaAccessControl
     @Override
     public void checkCanRenameColumn(SystemSecurityContext context, CatalogSchemaTableName table)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.fromTrinoTable(table))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "RenameColumn", resource)) {
-            denyRenameColumn(table.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "RenameColumn", AccessDeniedException::denyRenameColumn, table);
     }
 
     @Override
     public void checkCanSelectFromColumns(SystemSecurityContext context, CatalogSchemaTableName table, Set<String> columns)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.Builder
-                        .fromTrinoTable(table)
-                        .columns(columns)
-                        .build())
-                .build();
-        if (!queryOpaWithSimpleResource(context, "SelectFromColumns", resource)) {
-            denySelectColumns(table.toString(), columns);
-        }
+        opaHighLevelClient.queryAndEnforce(
+                context,
+                "SelectFromColumns",
+                AccessDeniedException::denySelectColumns,
+                table,
+                columns);
     }
 
     @Override
     public void checkCanInsertIntoTable(SystemSecurityContext context, CatalogSchemaTableName table)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.fromTrinoTable(table))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "InsertIntoTable", resource)) {
-            denyInsertTable(table.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "InsertIntoTable", AccessDeniedException::denyInsertTable, table);
     }
 
     @Override
     public void checkCanDeleteFromTable(SystemSecurityContext context, CatalogSchemaTableName table)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.fromTrinoTable(table))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "DeleteFromTable", resource)) {
-            denyDeleteTable(table.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "DeleteFromTable", AccessDeniedException::denyDeleteTable, table);
     }
 
     @Override
     public void checkCanTruncateTable(SystemSecurityContext context, CatalogSchemaTableName table)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.fromTrinoTable(table))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "TruncateTable", resource)) {
-            denyTruncateTable(table.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "TruncateTable", AccessDeniedException::denyTruncateTable, table);
     }
 
     @Override
     public void checkCanUpdateTableColumns(SystemSecurityContext securityContext, CatalogSchemaTableName table, Set<String> updatedColumnNames)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.Builder
-                        .fromTrinoTable(table)
-                        .columns(updatedColumnNames)
-                        .build())
-                .build();
-
-        if (!queryOpaWithSimpleResource(securityContext, "UpdateTableColumns", resource)) {
-            denyUpdateTableColumns(table.toString(), updatedColumnNames);
-        }
+        opaHighLevelClient.queryAndEnforce(
+                securityContext,
+                "UpdateTableColumns",
+                AccessDeniedException::denyUpdateTableColumns,
+                table,
+                updatedColumnNames);
     }
 
     @Override
     public void checkCanCreateView(SystemSecurityContext context, CatalogSchemaTableName view)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.fromTrinoTable(view))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "CreateView", resource)) {
-            denyCreateView(view.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "CreateView", AccessDeniedException::denyCreateView, view);
     }
 
     @Override
     public void checkCanRenameView(SystemSecurityContext context, CatalogSchemaTableName view, CatalogSchemaTableName newView)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
+        OpaQueryInputResource oldResource = new OpaQueryInputResource
                 .Builder()
                 .table(TrinoTable.fromTrinoTable(view))
                 .build();
-        OpaQueryInputResource targetResource = new OpaQueryInputResource
+        OpaQueryInputResource newResource = new OpaQueryInputResource
                 .Builder()
                 .table(TrinoTable.fromTrinoTable(newView))
                 .build();
-        OpaQueryInputAction action = new OpaQueryInputAction
-                .Builder()
-                .operation("RenameView")
-                .resource(resource)
-                .targetResource(targetResource)
-                .build();
-        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
-
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpaWithSourceAndTargetResource(context, "RenameView", oldResource, newResource)) {
             denyRenameView(view.toString(), newView.toString());
         }
     }
@@ -806,7 +545,7 @@ public class OpaAccessControl
                 .build();
         OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpa(input)) {
             denySetViewAuthorization(view.toString(), principal);
         }
     }
@@ -814,105 +553,66 @@ public class OpaAccessControl
     @Override
     public void checkCanDropView(SystemSecurityContext context, CatalogSchemaTableName view)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.fromTrinoTable(view))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "DropView", resource)) {
-            denyDropView(view.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "DropView", AccessDeniedException::denyDropView, view);
     }
 
     @Override
     public void checkCanCreateViewWithSelectFromColumns(SystemSecurityContext context, CatalogSchemaTableName table, Set<String> columns)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.Builder
-                        .fromTrinoTable(table)
-                        .columns(columns)
-                        .build())
-                .build();
-        if (!queryOpaWithSimpleResource(context, "CreateViewWithSelectFromColumns", resource)) {
-            denyCreateViewWithSelect(table.toString(), context.getIdentity());
-        }
+        opaHighLevelClient.queryAndEnforce(
+                context,
+                "CreateViewWithSelectFromColumns",
+                (tableAsString, columnSet) -> denyCreateViewWithSelect(tableAsString, context.getIdentity()),
+                table,
+                columns);
     }
 
     @Override
     public void checkCanCreateMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView, Map<String, Object> properties)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.Builder
-                        .fromTrinoTable(materializedView)
-                        .properties(properties)
-                        .build())
-                .build();
-        if (!queryOpaWithSimpleResource(context, "CreateMaterializedView", resource)) {
-            denyCreateMaterializedView(materializedView.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(
+                context,
+                "CreateMaterializedView",
+                AccessDeniedException::denyCreateMaterializedView,
+                materializedView,
+                properties);
     }
 
     @Override
     public void checkCanRefreshMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.fromTrinoTable(materializedView))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "RefreshMaterializedView", resource)) {
-            denyRefreshMaterializedView(materializedView.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "RefreshMaterializedView", AccessDeniedException::denyRefreshMaterializedView, materializedView);
     }
 
     @Override
     public void checkCanSetMaterializedViewProperties(SystemSecurityContext context, CatalogSchemaTableName materializedView, Map<String, Optional<Object>> properties)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.Builder
-                        .fromTrinoTable(materializedView)
-                        .optionalProperties(properties)
-                        .build())
-                .build();
-        if (!queryOpaWithSimpleResource(context, "SetMaterializedViewProperties", resource)) {
-            denySetMaterializedViewProperties(materializedView.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(
+                context,
+                "SetMaterializedViewProperties",
+                AccessDeniedException::denySetMaterializedViewProperties,
+                materializedView,
+                properties);
     }
 
     @Override
     public void checkCanDropMaterializedView(SystemSecurityContext context, CatalogSchemaTableName materializedView)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .table(TrinoTable.fromTrinoTable(materializedView))
-                .build();
-        if (!queryOpaWithSimpleResource(context, "DropMaterializedView", resource)) {
-            denyDropMaterializedView(materializedView.toString());
-        }
+        opaHighLevelClient.queryAndEnforce(context, "DropMaterializedView", AccessDeniedException::denyDropMaterializedView, materializedView);
     }
 
     @Override
     public void checkCanRenameMaterializedView(SystemSecurityContext context, CatalogSchemaTableName view, CatalogSchemaTableName newView)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
+        OpaQueryInputResource oldResource = new OpaQueryInputResource
                 .Builder()
                 .table(TrinoTable.fromTrinoTable(view))
                 .build();
-        OpaQueryInputResource targetResource = new OpaQueryInputResource
+        OpaQueryInputResource newResource = new OpaQueryInputResource
                 .Builder()
                 .table(TrinoTable.fromTrinoTable(newView))
                 .build();
-
-        OpaQueryInputAction action = new OpaQueryInputAction
-                .Builder()
-                .operation("RenameMaterializedView")
-                .resource(resource)
-                .targetResource(targetResource)
-                .build();
-        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
-
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpaWithSourceAndTargetResource(context, "RenameMaterializedView", oldResource, newResource)) {
             denyRenameMaterializedView(view.toString(), newView.toString());
         }
     }
@@ -922,7 +622,7 @@ public class OpaAccessControl
     {
         OpaQueryInputResource resource = new OpaQueryInputResource
                 .Builder()
-                .function(new TrinoFunction(functionName))
+                .function(functionName)
                 .build();
         OpaQueryInputGrant opaGrantee = new OpaQueryInputGrant
                 .Builder()
@@ -937,7 +637,7 @@ public class OpaAccessControl
                 .build();
         OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpa(input)) {
             denyGrantExecuteFunctionPrivilege(functionName, context.getIdentity(), trinoPrincipalToString(grantee));
         }
     }
@@ -967,7 +667,7 @@ public class OpaAccessControl
                 .build();
         OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpa(input)) {
             denyGrantExecuteFunctionPrivilege(functionName.toString(), context.getIdentity(), trinoPrincipalToString(grantee));
         }
     }
@@ -980,14 +680,8 @@ public class OpaAccessControl
                 .catalog(catalogName)
                 .catalogSessionProperty(propertyName)
                 .build();
-        OpaQueryInputAction action = new OpaQueryInputAction
-                .Builder()
-                .operation("SetCatalogSessionProperty")
-                .resource(resource)
-                .build();
-        OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpaWithSimpleResource(context, "SetCatalogSessionProperty", resource)) {
             denySetCatalogSessionProperty(propertyName);
         }
     }
@@ -1013,7 +707,7 @@ public class OpaAccessControl
                 .build();
         OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpa(input)) {
             denyGrantSchemaPrivilege(privilege.toString(), schema.toString());
         }
     }
@@ -1038,7 +732,7 @@ public class OpaAccessControl
                 .build();
         OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpa(input)) {
             denyDenySchemaPrivilege(privilege.toString(), schema.toString());
         }
     }
@@ -1064,7 +758,7 @@ public class OpaAccessControl
                 .build();
         OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpa(input)) {
             denyRevokeSchemaPrivilege(privilege.toString(), schema.toString());
         }
     }
@@ -1090,7 +784,7 @@ public class OpaAccessControl
                 .build();
         OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpa(input)) {
             denyGrantTablePrivilege(privilege.toString(), table.toString());
         }
     }
@@ -1115,7 +809,7 @@ public class OpaAccessControl
                 .build();
         OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpa(input)) {
             denyDenyTablePrivilege(privilege.toString(), table.toString());
         }
     }
@@ -1141,7 +835,7 @@ public class OpaAccessControl
                 .build();
         OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpa(input)) {
             denyRevokeTablePrivilege(privilege.toString(), table.toString());
         }
     }
@@ -1149,9 +843,7 @@ public class OpaAccessControl
     @Override
     public void checkCanShowRoles(SystemSecurityContext context)
     {
-        if (!queryOpaWithSimpleAction(context, "ShowRoles")) {
-            denyShowRoles();
-        }
+        opaHighLevelClient.queryAndEnforce(context, "ShowRoles", AccessDeniedException::denyShowRoles);
     }
 
     @Override
@@ -1169,7 +861,7 @@ public class OpaAccessControl
                 .build();
         OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpa(input)) {
             denyCreateRole(role);
         }
     }
@@ -1177,13 +869,7 @@ public class OpaAccessControl
     @Override
     public void checkCanDropRole(SystemSecurityContext context, String role)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource
-                .Builder()
-                .role(role)
-                .build();
-        if (!queryOpaWithSimpleResource(context, "DropRole", resource)) {
-            denyDropRole(role);
-        }
+        opaHighLevelClient.queryAndEnforce(context, "DropRole", AccessDeniedException::denyDropRole, OpaQueryInputResource.Builder::role, role);
     }
 
     @Override
@@ -1210,7 +896,7 @@ public class OpaAccessControl
                 .build();
         OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpa(input)) {
             denyGrantRoles(roles, grantees);
         }
     }
@@ -1240,7 +926,7 @@ public class OpaAccessControl
                 .build();
         OpaQueryInput input = new OpaQueryInput(OpaQueryContext.fromSystemSecurityContext(context), action);
 
-        if (!queryOpa(input)) {
+        if (!opaHighLevelClient.queryOpa(input)) {
             denyRevokeRoles(roles, grantees);
         }
     }
@@ -1248,25 +934,19 @@ public class OpaAccessControl
     @Override
     public void checkCanShowRoleAuthorizationDescriptors(SystemSecurityContext context)
     {
-        if (!queryOpaWithSimpleAction(context, "ShowRoleAuthorizationDescriptors")) {
-            denyShowRoleAuthorizationDescriptors();
-        }
+        opaHighLevelClient.queryAndEnforce(context, "ShowRoleAuthorizationDescriptors", AccessDeniedException::denyShowRoleAuthorizationDescriptors);
     }
 
     @Override
     public void checkCanShowCurrentRoles(SystemSecurityContext context)
     {
-        if (!queryOpaWithSimpleAction(context, "ShowCurrentRoles")) {
-            denyShowCurrentRoles();
-        }
+        opaHighLevelClient.queryAndEnforce(context, "ShowCurrentRoles", AccessDeniedException::denyShowCurrentRoles);
     }
 
     @Override
     public void checkCanShowRoleGrants(SystemSecurityContext context)
     {
-        if (!queryOpaWithSimpleAction(context, "ShowRoleGrants")) {
-            denyShowRoleGrants();
-        }
+        opaHighLevelClient.queryAndEnforce(context, "ShowRoleGrants", AccessDeniedException::denyShowRoleGrants);
     }
 
     @Override
@@ -1279,9 +959,9 @@ public class OpaAccessControl
                         .catalogName(procedure.getCatalogName())
                         .schemaName(procedure.getSchemaName())
                         .build())
-                .function(new TrinoFunction(procedure.getRoutineName()))
+                .function(procedure.getRoutineName())
                 .build();
-        if (!queryOpaWithSimpleResource(systemSecurityContext, "ExecuteProcedure", resource)) {
+        if (!opaHighLevelClient.queryOpaWithSimpleResource(systemSecurityContext, "ExecuteProcedure", resource)) {
             denyExecuteProcedure(procedure.toString());
         }
     }
@@ -1289,13 +969,12 @@ public class OpaAccessControl
     @Override
     public void checkCanExecuteFunction(SystemSecurityContext systemSecurityContext, String functionName)
     {
-        OpaQueryInputResource resource = new OpaQueryInputResource.Builder()
-                .function(new TrinoFunction(functionName))
-                .build();
-
-        if (!queryOpaWithSimpleResource(systemSecurityContext, "ExecuteFunction", resource)) {
-            denyExecuteFunction(functionName);
-        }
+        opaHighLevelClient.queryAndEnforce(
+                systemSecurityContext,
+                "ExecuteFunction",
+                AccessDeniedException::denyExecuteFunction,
+                OpaQueryInputResource.Builder::function,
+                functionName);
     }
 
     @Override
@@ -1311,7 +990,7 @@ public class OpaAccessControl
                 .function(new TrinoFunction(functionName.getRoutineName(), functionKind.name()))
                 .build();
 
-        if (!queryOpaWithSimpleResource(systemSecurityContext, "ExecuteFunction", resource)) {
+        if (!opaHighLevelClient.queryOpaWithSimpleResource(systemSecurityContext, "ExecuteFunction", resource)) {
             denyExecuteFunction(functionName.toString());
         }
     }
@@ -1322,10 +1001,10 @@ public class OpaAccessControl
         OpaQueryInputResource resource = new OpaQueryInputResource
                 .Builder()
                 .table(TrinoTable.fromTrinoTable(table))
-                .function(new TrinoFunction(procedure))
+                .function(procedure)
                 .build();
 
-        if (!queryOpaWithSimpleResource(systemSecurityContext, "ExecuteTableProcedure", resource)) {
+        if (!opaHighLevelClient.queryOpaWithSimpleResource(systemSecurityContext, "ExecuteTableProcedure", resource)) {
             denyExecuteTableProcedure(table.toString(), procedure);
         }
     }

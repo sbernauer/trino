@@ -22,7 +22,6 @@ import io.trino.plugin.openpolicyagent.schema.OpaQueryContext;
 import io.trino.plugin.openpolicyagent.schema.OpaQueryInput;
 import io.trino.plugin.openpolicyagent.schema.OpaQueryInputAction;
 import io.trino.plugin.openpolicyagent.schema.OpaQueryInputResource;
-import io.trino.plugin.openpolicyagent.schema.OpaQueryResult;
 import io.trino.plugin.openpolicyagent.schema.TrinoSchema;
 import io.trino.plugin.openpolicyagent.schema.TrinoTable;
 import io.trino.plugin.openpolicyagent.schema.TrinoUser;
@@ -39,7 +38,6 @@ import java.util.function.Function;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
-import static io.trino.plugin.openpolicyagent.OpaHttpClient.propagatingConsumeFuture;
 import static java.util.Objects.requireNonNull;
 
 public class OpaBatchAccessControl
@@ -47,22 +45,24 @@ public class OpaBatchAccessControl
 {
     private final JsonCodec<OpaBatchQueryResult> batchResultCodec;
     private final URI opaBatchedPolicyUri;
+    private final OpaHttpClient opaHttpClient;
 
     @Inject
     public OpaBatchAccessControl(
-            JsonCodec<OpaQueryResult> queryResultCodec,
+            OpaHighLevelClient opaHighLevelClient,
             JsonCodec<OpaBatchQueryResult> batchResultCodec,
             OpaHttpClient httpClient,
             OpaConfig config)
     {
-        super(queryResultCodec, httpClient, config);
+        super(opaHighLevelClient);
         this.opaBatchedPolicyUri = config.getOpaBatchUri().orElseThrow();
         this.batchResultCodec = batchResultCodec;
+        this.opaHttpClient = httpClient;
     }
 
     private List<Integer> batchQueryOpa(OpaQueryInput input)
     {
-        return propagatingConsumeFuture(opaHttpClient.submitOpaRequest(input, opaBatchedPolicyUri, batchResultCodec)).result();
+        return opaHttpClient.getOpaResponse(input, opaBatchedPolicyUri, batchResultCodec).result();
     }
 
     private <T> Set<T> batchFilterFromOpa(SystemSecurityContext context, String operation, Collection<T> items, Function<List<T>, List<OpaQueryInputResource>> converter)

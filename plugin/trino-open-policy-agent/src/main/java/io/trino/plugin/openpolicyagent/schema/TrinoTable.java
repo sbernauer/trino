@@ -18,11 +18,7 @@ import com.fasterxml.jackson.annotation.JsonUnwrapped;
 import com.google.common.collect.ImmutableSet;
 import io.trino.spi.connector.CatalogSchemaTableName;
 
-import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
-
-import static java.util.Objects.requireNonNullElse;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record TrinoTable(@JsonUnwrapped TrinoSchema catalogSchema,
@@ -38,11 +34,6 @@ public record TrinoTable(@JsonUnwrapped TrinoSchema catalogSchema,
         protected Builder getInstance()
         {
             return this;
-        }
-
-        public Builder optionalProperties(Map<String, Optional<Object>> properties)
-        {
-            return propertiesWithGetter(properties, (i) -> requireNonNullElse(i, Optional.empty()));
         }
 
         public Builder tableName(String tableName)
