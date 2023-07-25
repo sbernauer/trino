@@ -13,19 +13,21 @@
  */
 package io.trino.plugin.openpolicyagent;
 
+import com.google.common.collect.ImmutableSet;
 import io.trino.Session;
-import io.trino.execution.QueryIdGenerator;
-import io.trino.metadata.SessionPropertyManager;
-import io.trino.server.testing.TestingTrinoServer;
+import io.trino.plugin.blackhole.BlackHolePlugin;
 import io.trino.spi.security.Identity;
-import io.trino.testing.MaterializedResult;
-import io.trino.testing.MaterializedRow;
-import io.trino.testing.TestingTrinoClient;
+import io.trino.testing.DistributedQueryRunner;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Named;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -39,30 +41,59 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
+import static com.google.common.collect.ImmutableSet.toImmutableSet;
+import static io.trino.plugin.openpolicyagent.FunctionalHelpers.Pair;
+import static io.trino.testing.TestingSession.testSessionBuilder;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @Testcontainers
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class OpaAccessControlSystemTest
 {
-    private static URI opaServerUri;
-    private static TestingTrinoServer trinoServer;
-    private static TestingTrinoClient trinoClient;
+    private URI opaServerUri;
+    private DistributedQueryRunner runner;
 
     private static final int OPA_PORT = 8181;
     @Container
     public static GenericContainer<?> opaContainer = new GenericContainer<>(DockerImageName.parse("openpolicyagent/opa:latest-rootless"))
             .withCommand("run", "--server", "--addr", ":%d".formatted(OPA_PORT))
             .withExposedPorts(OPA_PORT);
+
+    private void ensureOpaUp()
+            throws IOException, InterruptedException
+    {
+        assertTrue(opaContainer.isRunning());
+        InetSocketAddress opaSocket = new InetSocketAddress(opaContainer.getHost(), opaContainer.getMappedPort(OPA_PORT));
+        String opaEndpoint = String.format("%s:%d", opaSocket.getHostString(), opaSocket.getPort());
+        System.out.println("OPA has endpoint " + opaEndpoint);
+        awaitSocketOpen(opaSocket, 100, 200);
+        this.opaServerUri = URI.create(String.format("http://%s/", opaEndpoint));
+    }
+
+    private void setupTrinoWithOpa(String basePolicyRelativeUri, Optional<String> batchPolicyRelativeUri)
+            throws Exception
+    {
+        ensureOpaUp();
+        Map<String, String> opaConfig = new HashMap<>();
+        opaConfig.put("opa.policy.uri", opaServerUri.resolve(basePolicyRelativeUri).toString());
+        batchPolicyRelativeUri.ifPresent(s -> opaConfig.put("opa.policy.batched-uri", opaServerUri.resolve(s).toString()));
+        this.runner = DistributedQueryRunner.builder(testSessionBuilder().build())
+                .setSystemAccessControl(new OpaAccessControlFactory().create(opaConfig))
+                .setNodeCount(1)
+                .build();
+        runner.installPlugin(new BlackHolePlugin());
+        runner.createCatalog("catalogOne", "blackhole");
+        runner.createCatalog("catalogTwo", "blackhole");
+    }
 
     private static void awaitSocketOpen(InetSocketAddress addr, int attempts, int timeoutMs)
             throws IOException, InterruptedException
@@ -84,35 +115,7 @@ public class OpaAccessControlSystemTest
                         .formatted(addr, attempts, timeoutMs));
     }
 
-    @BeforeAll
-    public static void ensureOpaUp()
-            throws IOException, InterruptedException
-    {
-        assertTrue(opaContainer.isRunning());
-        InetSocketAddress opaSocket = new InetSocketAddress(opaContainer.getHost(), opaContainer.getMappedPort(OPA_PORT));
-        String opaEndpoint = String.format("%s:%d", opaSocket.getHostString(), opaSocket.getPort());
-        System.out.println("OPA has endpoint " + opaEndpoint);
-        awaitSocketOpen(opaSocket, 100, 200);
-        opaServerUri = URI.create(String.format("http://%s/", opaEndpoint));
-    }
-
-    @AfterAll
-    public static void teardown()
-            throws IOException
-    {
-        try {
-            if (trinoClient != null) {
-                trinoClient.close();
-            }
-        }
-        finally {
-            if (trinoServer != null) {
-                trinoServer.close();
-            }
-        }
-    }
-
-    private String stringOfLines(String... lines)
+    private static String stringOfLines(String... lines)
     {
         StringBuilder out = new StringBuilder();
         for (String line : lines) {
@@ -136,54 +139,81 @@ public class OpaAccessControlSystemTest
         assertEquals(policyRes.statusCode(), 200, "Failed to submit policy: " + policyRes.body());
     }
 
+    private Session user(String user)
+    {
+        return testSessionBuilder().setIdentity(Identity.ofUser(user)).build();
+    }
+
+    private Set<String> querySetOfStrings(Session session, String query)
+    {
+        return runner.execute(session, query)
+                .getMaterializedRows()
+                .stream()
+                .map((i) -> i.getField(0).toString())
+                .collect(toImmutableSet());
+    }
+
+    private static Stream<Arguments> filterSchemaTests()
+    {
+        Stream<Pair<String, Set<String>>> userAndExpectedCatalogs = Stream.of(
+                Pair.of("bob", ImmutableSet.of("catalogOne")),
+                Pair.of("admin", ImmutableSet.of("catalogOne", "catalogTwo", "system")));
+        return userAndExpectedCatalogs.map((i) -> Arguments.of(Named.of(i.getFirst(), i.getFirst()), i.getSecond()));
+    }
+
     @Nested
+    @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     @DisplayName("Unbatched Authorizer Tests")
     class UnbatchedAuthorizerTests
     {
         @BeforeAll
-        public static void setupTrino()
+        public void setupTrino()
+                throws Exception
         {
-            QueryIdGenerator idGen = new QueryIdGenerator();
-            Identity identity = Identity.forUser("bob").build();
-            SessionPropertyManager sessionPropertyManager = new SessionPropertyManager();
-            Session session = Session.builder(sessionPropertyManager)
-                    .setQueryId(idGen.createNextQueryId()).setIdentity(identity).build();
-            trinoServer = TestingTrinoServer.builder()
-                    .setSystemAccessControls(
-                            Collections.singletonList(
-                                    new OpaAccessControlFactory()
-                                            .create(
-                                                    Map.of("opa.policy.uri", opaServerUri.resolve("v1/data/trino/allow").toString()))))
-                    .build();
-            trinoClient = new TestingTrinoClient(trinoServer, session);
+            setupTrinoWithOpa("v1/data/trino/allow", Optional.empty());
         }
 
-        @Test
-        public void testShouldAllowQueryIfDirected()
+        @AfterAll
+        public void teardown()
+        {
+            if (runner != null) {
+                runner.close();
+            }
+        }
+
+        @ParameterizedTest(name = "{index}: {0}")
+        @MethodSource("io.trino.plugin.openpolicyagent.OpaAccessControlSystemTest#filterSchemaTests")
+        public void testAllowsQueryAndFilters(String userName, Set<String> expectedCatalogs)
                 throws IOException, InterruptedException
         {
             submitPolicy(
                     """
                             package trino
                             import future.keywords.in
+                            import future.keywords.if
+
                             default allow = false
                             allow {
                               is_bob
                               can_be_accessed_by_bob
                             }
-                            is_bob() {
+                            allow if is_admin
+
+                            is_admin {
+                              input.context.identity.user == "admin"
+                            }
+                            is_bob {
                               input.context.identity.user == "bob"
                             }
-                            can_be_accessed_by_bob() {
-                              input.action.operation in ["ImpersonateUser", "FilterCatalogs", "AccessCatalog", "ExecuteQuery"]
+                            can_be_accessed_by_bob {
+                              input.action.operation in ["ImpersonateUser", "ExecuteQuery"]
+                            }
+                            can_be_accessed_by_bob {
+                              input.action.operation in ["FilterCatalogs", "AccessCatalog"]
+                              input.action.resource.catalog.name == "catalogOne"
                             }""");
-            List<String> catalogs = new ArrayList<>();
-            MaterializedResult result =
-                    trinoClient.execute("SHOW CATALOGS").getResult();
-            for (MaterializedRow row : result) {
-                catalogs.add(row.getField(0).toString());
-            }
-            assertEquals(Collections.singletonList("system"), catalogs);
+            Set<String> catalogs = querySetOfStrings(user(userName), "SHOW CATALOGS");
+            assertEquals(expectedCatalogs, catalogs);
         }
 
         @Test
@@ -195,82 +225,82 @@ public class OpaAccessControlSystemTest
                             package trino
                             import future.keywords.in
                             default allow = false
+
                             allow {
-                              is_bob
-                              can_be_accessed_by_bob
+                                input.context.identity.user in ["someone", "admin"]
                             }
-                            is_bob() {
-                              input.context.identity.user == "bob"
-                            }
-                            can_be_accessed_by_bob() {
-                              input.action.operation in ["ImpersonateUser", "FilterCatalogs", "AccessCatalog", "ExecuteQuery"]
-                            }""");
+                            """);
             RuntimeException error = assertThrows(RuntimeException.class, () -> {
-                trinoClient.execute("SHOW SCHEMAS IN system");
+                runner.execute(user("bob"), "SHOW CATALOGS");
             });
             assertTrue(error.getMessage().contains("Access Denied"),
                     "Error must mention 'Access Denied': " + error.getMessage());
+            // smoke test: we can still query if we are the right user
+            runner.execute(user("admin"), "SHOW CATALOGS");
         }
     }
 
     @Nested
+    @TestInstance(TestInstance.Lifecycle.PER_CLASS)
     @DisplayName("Batched Authorizer Tests")
     class BatchedAuthorizerTests
     {
         @BeforeAll
-        public static void setupTrino()
+        public void setupTrino()
+                throws Exception
         {
-            QueryIdGenerator idGen = new QueryIdGenerator();
-            Identity identity = Identity.forUser("bob").build();
-            SessionPropertyManager sessionPropertyManager = new SessionPropertyManager();
-            Session session = Session.builder(sessionPropertyManager)
-                    .setQueryId(idGen.createNextQueryId()).setIdentity(identity).build();
-            trinoServer = TestingTrinoServer.builder()
-                    .setSystemAccessControls(
-                            Collections.singletonList(
-                                    new OpaAccessControlFactory()
-                                            .create(
-                                                    Map.of(
-                                                            "opa.policy.uri", opaServerUri.resolve("v1/data/trino/allow").toString(),
-                                                            "opa.policy.batched-uri", opaServerUri.resolve("v1/data/trino/extended").toString()))))
-                    .build();
-            trinoClient = new TestingTrinoClient(trinoServer, session);
+            setupTrinoWithOpa("v1/data/trino/allow", Optional.of("v1/data/trino/extended"));
         }
 
-        @Test
-        public void testFilterOutItems()
+        @AfterAll
+        public void teardown()
+        {
+            if (runner != null) {
+                runner.close();
+            }
+        }
+
+        @ParameterizedTest(name = "{index}: {0}")
+        @MethodSource("io.trino.plugin.openpolicyagent.OpaAccessControlSystemTest#filterSchemaTests")
+        public void testFilterOutItemsBatch(String userName, Set<String> expectedCatalogs)
                 throws IOException, InterruptedException
         {
             submitPolicy(
                     """
                             package trino
                             import future.keywords.in
+                            import future.keywords.if
                             default allow = false
 
+                            allow if is_admin
+
                             allow {
+                                is_bob
                                 input.action.operation in ["AccessCatalog", "ExecuteQuery", "ImpersonateUser", "ShowSchemas", "SelectFromColumns"]
                             }
 
-                            is_bob() {
+                            is_bob {
                                 input.context.identity.user == "bob"
                             }
 
-                            extended[i] {
-                                some i
-                                input.action.operation == "FilterSchemas"
-                                input.action.filterResources[i].schema.schemaName in ["jdbc", "metadata"]
+                            is_admin {
+                                input.context.identity.user == "admin"
                             }
 
                             extended[i] {
                                 some i
+                                is_bob
                                 input.action.operation == "FilterCatalogs"
+                                input.action.filterResources[i].catalog.name == "catalogOne"
+                            }
+
+                            extended[i] {
+                                some i
                                 input.action.filterResources[i]
+                                is_admin
                             }""");
-            Set<String> schemas = new HashSet<>();
-            trinoClient.execute("SHOW SCHEMAS FROM system").getResult()
-                    .iterator()
-                    .forEachRemaining((i) -> schemas.add(i.getField(0).toString()));
-            assertEquals(Set.of("jdbc", "metadata"), schemas);
+            Set<String> catalogs = querySetOfStrings(user(userName), "SHOW CATALOGS");
+            assertEquals(expectedCatalogs, catalogs);
         }
 
         @Test
@@ -283,7 +313,7 @@ public class OpaAccessControlSystemTest
                             import future.keywords.in
                             default allow = false""");
             RuntimeException error = assertThrows(RuntimeException.class, () -> {
-                trinoClient.execute("SELECT version()");
+                runner.execute(user("bob"), "SELECT version()");
             });
             assertTrue(error.getMessage().contains("Access Denied"),
                     "Error must mention 'Access Denied': " + error.getMessage());
@@ -299,12 +329,10 @@ public class OpaAccessControlSystemTest
                             import future.keywords.in
                             default allow = false
                             allow {
+                                input.context.identity.user == "bob"
                                 input.action.operation in ["ImpersonateUser", "ExecuteFunction", "AccessCatalog", "ExecuteQuery"]
                             }""");
-            Set<String> version = new HashSet<>();
-            trinoClient.execute("SELECT version()").getResult()
-                    .iterator()
-                    .forEachRemaining((i) -> version.add(i.getField(0).toString()));
+            Set<String> version = querySetOfStrings(user("bob"), "SELECT version()");
             assertFalse(version.isEmpty());
         }
     }
