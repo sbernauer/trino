@@ -8,7 +8,7 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>trino-openpolicyagent</artifactId>
+    <artifactId>trino-open-policy-agent</artifactId>
 
     <packaging>trino-plugin</packaging>
     <description>Trino - Open Policy Agent</description>
