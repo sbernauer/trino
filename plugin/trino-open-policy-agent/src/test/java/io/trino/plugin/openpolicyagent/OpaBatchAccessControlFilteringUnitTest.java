@@ -53,7 +53,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public class OpaBatchAccessControlFilteringUnitTest
 {
     private static URI opaServerUri = URI.create("http://my-uri/");
-    private static URI opaExtendedServerUri = URI.create("http://my-uri/extended");
+    private static URI opaExtendedServerUri = URI.create("http://my-uri/batchAllow");
     private HttpClientUtils.InstrumentedHttpClient mockClient;
     private OpaAccessControl authorizer;
     private JsonMapper jsonMapper = new JsonMapper();

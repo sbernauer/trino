@@ -249,7 +249,7 @@ public class OpaAccessControlSystemTest
         public void setupTrino()
                 throws Exception
         {
-            setupTrinoWithOpa("v1/data/trino/allow", Optional.of("v1/data/trino/extended"));
+            setupTrinoWithOpa("v1/data/trino/allow", Optional.of("v1/data/trino/batchAllow"));
         }
 
         @AfterAll
@@ -287,14 +287,14 @@ public class OpaAccessControlSystemTest
                                 input.context.identity.user == "admin"
                             }
 
-                            extended[i] {
+                            batchAllow[i] {
                                 some i
                                 is_bob
                                 input.action.operation == "FilterCatalogs"
                                 input.action.filterResources[i].catalog.name == "catalogOne"
                             }
 
-                            extended[i] {
+                            batchAllow[i] {
                                 some i
                                 input.action.filterResources[i]
                                 is_admin
