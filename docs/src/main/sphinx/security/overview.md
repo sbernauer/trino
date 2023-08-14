@@ -114,11 +114,14 @@ providers to Trino user names.
 Trino's {doc}`default method of access control <built-in-system-access-control>`
 allows all operations for all authenticated users.
 
-To implement access control, use:
+To implement access control, use one or more of the following authorization mechanisms:
 
 - {doc}`File-based system access control <file-system-access-control>`, where
   you configure JSON files that specify fine-grained user access restrictions at
   the catalog, schema, or table level.
+- {doc}`OPA system access control <opa-system-access-control>`, where
+  [Open Policy Agent (OPA)](https://www.openpolicyagent.org/) is used as an
+  authorization engine.
 
 In addition, Trino {doc}`provides an API </develop/system-access-control>` that
 allows you to create a custom access control method, or to extend an existing
